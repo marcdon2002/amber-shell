@@ -14,9 +14,9 @@ Ein kompakter Terminalassistent für **macOS, Apple Terminal und Zsh**: Frage st
 > [!TIP]
 > **Ctrl-X, danach Ctrl-A** öffnet Amber direkt am Prompt. **Ctrl-Y** übernimmt den ausgewählten Befehl. Ausgeführt wird er erst durch ein separates normales **Enter in der Shell**. Escape oder Ctrl-C erhalten die vorherige Eingabe samt Cursor.
 
-![Amber im Terminal: Frage, laufende Antwort, fertiger Befehl und Fehlerzustand](./assets/amber-demo.gif)
+![Amber öffnen, eine Frage stellen, nachfragen und den Befehl editierbar in die Shell übernehmen](./assets/amber-demo.gif)
 
-*Synthetische Vorschau aus dem tatsächlichen Terminalrenderer mit Demo-Daten. Terminalschrift und Farben können je nach Profil abweichen.*
+*Produktablauf aus der echten Ratatui-Oberfläche mit simulierten Antworten und beispielhaften Wartezeiten. Ctrl-Y übernimmt den Befehl als editierbaren Text; ausgeführt wird er erst mit Enter in der Shell.*
 
 ## Überblick
 
@@ -215,9 +215,8 @@ Tests mit echten Modellanfragen sind ausdrücklich opt-in. Im normalen Testlauf 
 Die README-Animation enthält ausschließlich Demo-Daten aus dem tatsächlichen Ratatui-Renderer:
 
 ```sh
-cargo run --locked --example render_frames -- work/readme-frames
-python3 tests/render_frames.py work/readme-frames
-python3 scripts/render-demo.py --input work/readme-frames
+TERM=xterm-256color cargo run --locked --example render_demo -- work/product-demo/timeline.json
+python3 scripts/render-demo.py --input work/product-demo/timeline.json
 ```
 
 Zwischendateien bleiben unter `work/`; nur die fertige Animation unter `assets/amber-demo.gif` wird versioniert.
