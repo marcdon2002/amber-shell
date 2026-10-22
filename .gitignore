@@ -1,0 +1,32 @@
+# Lokale Arbeitsunterlagen und exportierte Kopien
+/work/
+/outputs/
+/docs/
+.DS_Store
+
+# Rust-Builds und Python-Testcache
+/target/
+__pycache__/
+*.pyc
+
+# Zugangsdaten und private Laufzeitdaten niemals versionieren
+.env
+.env.*
+*.pem
+*.key
+*.log
+/.amber-shell/
+/auth.json
+/history/
+/transcripts/
+
+# Lokale Agentenregeln und Laufzeit-Einstellungen
+/AGENTS.md
+/DESIGN.md
+/design-qa.md
+/PRODUCT.md
+/.agents/
+/.codex/
+/settings.json
+/history*.json
+/history*.lock

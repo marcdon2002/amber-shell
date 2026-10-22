@@ -1,0 +1,25 @@
+[package]
+name = "amber-shell"
+version = "0.7.0"
+edition = "2024"
+rust-version = "1.88"
+description = "Compact inline zsh assistant for macOS with official Codex authentication"
+publish = false
+license = "MIT"
+repository = "https://github.com/marcdon2002/amber-shell"
+readme = "README.md"
+
+[dependencies]
+ratatui = "0.30.2"
+crossterm = "0.29"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+unicode-segmentation = "1.12"
+unicode-width = "0.2"
+tempfile = "3"
+libc = "0.2"
+pulldown-cmark = { version = "=0.13.4", default-features = false }
+
+[[bin]]
+name = "amber-shell"
+path = "src/main.rs"
