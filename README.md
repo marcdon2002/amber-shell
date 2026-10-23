@@ -53,6 +53,8 @@ Homebrew lädt das fertige ARM64-Paket mit SHA256-Prüfung; eine Rust-Toolchain 
 
 `amber-shell-setup` sichert vorhandene `.zshenv` und `.zshrc`, ergänzt die markierten Amber-Blöcke und kann die bisherige Installation unter `~/.local` übernehmen. Es ersetzt ausschließlich unveränderte, vom Installer erzeugte Blöcke; eigene Anpassungen und Symlinks benötigen eine bewusste Zuordnung. Die Einbindung verweist auf Homebrews stabilen `opt`-Pfad, damit Updates keine erneute Einrichtung brauchen. Das Setup startet keine Modellanfrage.
 
+Bei einer früheren Quellcode-Installation kann `~/.local/bin/amber-shell` im `PATH` vor Homebrew stehen. Der eingerichtete Hotkey verwendet ausdrücklich die Homebrew-Binary. Für direkte CLI-Aufrufe die alte Datei nach erfolgreicher Migration aus dem `PATH` nehmen oder `"$(brew --prefix amber-shell)/bin/amber-shell"` aufrufen.
+
 Aktualisieren:
 
 ```sh
