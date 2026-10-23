@@ -5,10 +5,12 @@ Usage:
   amber-shell <COMMAND> [OPTIONS]
 
 Get started
-  amber-shell login                  Log in with ChatGPT in your browser
-  amber-shell                        Open Amber and type a question
+  amber-shell                        Open Amber
 
   With zsh integration installed, press Ctrl-X, then Ctrl-A at a free prompt.
+  On first open, press Enter on Log in with ChatGPT. Finish the browser login;
+  Amber waits and opens the question input in the same dialog automatically.
+  If already signed in, type a question. No separate login command is needed.
 
 Commands
   login [status | --device-auth]      Sign in or check Amber's login
@@ -21,7 +23,7 @@ Commands
 
 Keys
   Ctrl-X, then Ctrl-A   Open Amber from the normal zsh prompt
-  Enter                Ask; in history, accept the selected command
+  Enter                Start/retry login; ask; in history, accept a command
   Ctrl-Y               Accept a complete command into the shell prompt
   Tab                  Switch between the question and history
   Up / Down            Read history and long replies
@@ -40,7 +42,7 @@ Context & language
   Saved history is separate from context for a new conversation.
 
 Advanced integration options
-  --simulate               Use simulated replies without a network request
+  --simulate               Use simulated replies; no login or network request
   --history-file PATH      Read NUL-separated shell commands, up to 32 KiB
   --capture-socket PATH    Read bounded output from the current shell session
   --result-file PATH       Write original command bytes plus NUL on acceptance
@@ -55,7 +57,14 @@ Usage:
   amber-shell login status
   amber-shell login --device-auth
 
-Browser login
+Integrated login
+  Open Amber and press Enter on Log in with ChatGPT. Finish signing in in
+  your browser; Amber continues in the same dialog automatically.
+  Enter retries or restarts login. Esc or Ctrl-C returns to the shell with
+  your original input preserved.
+  This command is an optional alternative to the integrated login.
+
+Browser login from the command line
   Run amber-shell login to open the official sign-in flow in your browser.
   Choose Log in with ChatGPT, finish signing in, then return to your terminal.
   A personal Codex login is not reused. Sign in once for Amber Shell.
@@ -94,7 +103,7 @@ Credential scope
   Your personal Codex login and browser ChatGPT session stay signed in.
   Amber's local history and settings are retained.
 
-  To sign in again, run amber-shell login.
+  Reopen Amber to sign in again, or use the optional amber-shell login command.
 
 Options
   --help, -h               Show this help
@@ -116,7 +125,7 @@ Options
   --fast                   Request the supported Fast tier
   --context-file PATH      Read selected UTF-8 context, up to 48 KiB
   --conversation-file PATH Read JSON question/reply pairs, up to 6 MiB
-  --simulate               Use a simulated reply without a network request
+  --simulate               Use a simulated reply; no login or network request
   --help, -h               Show this help
 
 Context & language
@@ -124,7 +133,7 @@ Context & language
   remain English. Only explicitly supplied context and conversation are sent.
 
   The JSON reply contains explanation and command. No command is executed.
-  Run amber-shell login before making live requests.
+  Sign in through Amber or amber-shell login before making live requests.
 "#;
 
 pub const SESSION: &str = r#"Start a shell with terminal output capture.
@@ -158,7 +167,8 @@ Checks
   Prints the selected Codex CLI version and Amber's dedicated login status.
   Does not send a model request or use your personal Codex login.
 
-  If Amber is signed out, run amber-shell login to log in with ChatGPT.
+  If Amber is signed out, open Amber and press Enter on Log in with ChatGPT.
+  The optional amber-shell login command also starts browser login.
 
 Codex executable
   AMBER_CODEX_BIN overrides the default: /opt/homebrew/bin/codex

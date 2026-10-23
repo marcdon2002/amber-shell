@@ -685,3 +685,111 @@ fn manual_reading_anchor_keeps_same_text_when_vertical_spacing_collapses() {
     assert_eq!(app.anchor, anchor);
     assert!(first_body(80, 20, &mut app).contains("EXPLANATION_10"));
 }
+
+#[test]
+fn sign_in_view_is_compact_and_hides_conversation_controls_and_private_state() {
+    use amber_shell::model::SignInState;
+    let mut app = App::new(std::array::from_fn(|_| "PRIVATE_CONTEXT".into()), false);
+    app.editor.insert("PRIVATE_DRAFT");
+    app.reviewing = true;
+    app.model_picker = true;
+    app.command_focus = true;
+    app.shell_commands.push("PRIVATE_COMMAND".into());
+    for (state, message, action) in [
+        (SignInState::Required, "browser", "log in"),
+        (SignInState::Starting, "Opening", ""),
+        (SignInState::Waiting, "browser", "restart"),
+        (
+            SignInState::Failed("https://private.invalid/?token=SECRET".into()),
+            "amber-shell doctor",
+            "retry",
+        ),
+    ] {
+        app.sign_in = Some(state);
+        for (width, height) in [(100, 20), (40, 14), (24, 9), (24, 6)] {
+            let mut terminal = Terminal::new(TestBackend::new(width, height)).unwrap();
+            terminal.draw(|f| ui::render(f, &mut app)).unwrap();
+            let b = terminal.backend().buffer();
+            let rows: Vec<String> = (0..height)
+                .map(|y| (0..width).map(|x| b[(x, y)].symbol()).collect())
+                .collect();
+            let text = rows.join("\n");
+            assert!(text.contains("amber"), "{width}x{height}: {text}");
+            assert!(
+                text.contains("Log in with ChatGPT"),
+                "{width}x{height}: {text}"
+            );
+            assert!(text.contains(message), "{width}x{height}: {text}");
+            assert!(
+                text.to_ascii_lowercase().contains(action),
+                "{width}x{height}: {text}"
+            );
+            assert!(
+                text.contains("Esc/Ctrl-C cancel"),
+                "{width}x{height}: {text}"
+            );
+            for hidden in [
+                "PRIVATE_", "SECRET", "https://", "Ctrl-O", "Ctrl-K", "Ctrl-Y", "Question",
+            ] {
+                assert!(
+                    !text.contains(hidden),
+                    "{width}x{height}: exposed {hidden}: {text}"
+                );
+            }
+            assert_eq!(b[(1, 0)].symbol().chars().count(), 1);
+            assert!(app.cursor_row < height);
+        }
+    }
+    assert_eq!(app.editor.text, "PRIVATE_DRAFT");
+    assert!(app.turns.is_empty());
+}
+
+#[test]
+fn sign_in_explains_the_browser_and_private_amber_login_with_wrapped_text() {
+    use amber_shell::model::SignInState;
+    let mut app = App::new(std::array::from_fn(|_| String::new()), false);
+    app.sign_in = Some(SignInState::Required);
+    for (width, height) in [(40, 14), (24, 9), (24, 6)] {
+        let shown = screen(width, height, &mut app);
+        assert!(
+            shown.contains("Private Amber login"),
+            "{width}x{height}: {shown}"
+        );
+        assert!(shown.contains("Codex"), "{width}x{height}: {shown}");
+        assert!(shown.contains("separate"), "{width}x{height}: {shown}");
+        assert!(shown.contains("Enter"), "{width}x{height}: {shown}");
+        assert!(shown.contains("browser"), "{width}x{height}: {shown}");
+        assert!(!shown.contains('…'), "login copy must wrap: {shown}");
+    }
+    app.sign_in = Some(SignInState::Waiting);
+    let shown = screen(40, 14, &mut app);
+    assert!(shown.contains("automatically"), "{shown}");
+}
+
+#[test]
+fn sign_in_branding_animates_without_color_and_uses_a_single_ascii_cell() {
+    use amber_shell::model::SignInState;
+    use ratatui::style::Color;
+    let mut app = App::new(std::array::from_fn(|_| String::new()), false);
+    app.sign_in = Some(SignInState::Waiting);
+    app.no_color = true;
+    app.ascii = true;
+    app.reduced_motion = false;
+    let mut marks = std::collections::HashSet::new();
+    for indicator in 0..4 {
+        app.indicator_frame = indicator;
+        let mut terminal = Terminal::new(TestBackend::new(40, 14)).unwrap();
+        terminal.draw(|f| ui::render(f, &mut app)).unwrap();
+        let b = terminal.backend().buffer();
+        marks.insert(b[(1, 0)].symbol().to_owned());
+        assert!(b.content.iter().all(|c| c.symbol().is_ascii()));
+        assert!(
+            b.content
+                .iter()
+                .all(|c| c.fg == Color::Reset && c.bg == Color::Reset)
+        );
+        assert_eq!(b[(2, 0)].symbol(), " ");
+        assert_eq!(b[(1, 1)].symbol(), " ");
+    }
+    assert!(marks.len() > 1);
+}

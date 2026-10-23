@@ -79,12 +79,18 @@ class VTScreen(pyte.HistoryScreen):
 
 
 class ShellSession:
-    def __init__(self, simulate=True, config_directory=None, cwd=None, shell_history=None, codex_program=None, capture_session=False):
+    def __init__(self, simulate=True, config_directory=None, cwd=None, shell_history=None, codex_program=None, capture_session=False, signed_in=True):
         self.temp = tempfile.TemporaryDirectory(prefix='amber-zle-e2e-')
         self.directory = Path(self.temp.name)
         self.cwd=Path(cwd).resolve() if cwd else self.directory
         self.config_directory = Path(config_directory) if config_directory else self.directory / 'config'
         self.config_directory.mkdir(parents=True, exist_ok=True)
+        if codex_program and not simulate and signed_in:
+            profile=self.config_directory/'amber-shell/codex'
+            profile.mkdir(parents=True,exist_ok=True,mode=0o700)
+            auth=profile/'auth.json'
+            auth.write_text('{"synthetic_login":true}')
+            auth.chmod(0o600)
         self.capture_file = self.directory / 'capture'
         self.cursor_file = self.directory / 'cursor'
         self.output = b''

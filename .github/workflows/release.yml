@@ -48,6 +48,8 @@ jobs:
           python3 tests/install_e2e.py
           python3 tests/pty_e2e.py
           python3 tests/session_bootstrap_e2e.py
+          python3 -m pip install --target work/testdeps -r tests/requirements.txt
+          python3 tests/onboarding_e2e.py
           cargo build --release --locked
       - name: Package release
         run: |

@@ -26,13 +26,14 @@ class AmberShell < Formula
       Install the official Codex CLI if needed:
         brew install --cask codex
 
-      Sign into Amber with ChatGPT after setup:
-        amber-shell login
+      Open a new terminal window, then press Ctrl-X followed by Ctrl-A.
+      On first open, press Enter on Log in with ChatGPT. Finish signing in
+      in your browser; Amber continues in the same dialog automatically.
+      No separate login command is required.
+
       Amber can reuse an existing Codex installation. Its login is separate
       from your personal Codex login; sign into Amber once even if Codex
       is already signed in. amber-shell logout signs out only Amber.
-
-      Open a new terminal window, then press Ctrl-X followed by Ctrl-A.
     EOS
   end
 

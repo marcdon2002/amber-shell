@@ -1,4 +1,4 @@
-use crate::model::{AnswerStatus, App, Turn, safe_text};
+use crate::model::{AnswerStatus, App, SignInState, Turn, safe_text};
 use pulldown_cmark::{Event, Parser, Tag, TagEnd};
 use ratatui::{
     Frame,
@@ -373,12 +373,186 @@ fn row_line(
     }
 }
 
+fn sign_in_rows(text: &str, width: u16) -> Vec<Row> {
+    wrap_content(
+        text,
+        width as usize,
+        &[ContentSpan {
+            range: 0..text.len(),
+            kind: ContentKind::Explanation,
+            continuation: "",
+            grouped: false,
+        }],
+    )
+}
+
+fn render_sign_in(frame: &mut Frame, app: &mut App) {
+    let area = frame.area();
+    let Some(state) = app.sign_in.as_ref() else {
+        return;
+    };
+    let compact = area.width < 36;
+    // Keep the copy, action and hints on the wordmark's text edge.
+    let text_x = area.x + if compact { 3 } else { 4 };
+    let text_width = area.right().saturating_sub(text_x + 1);
+    let tiny = area.height < 9;
+    let (full, short, action) = match state {
+        SignInState::Required => (
+            "Use your ChatGPT account.\nEnter opens your browser.\n\nPrivate Amber login.\nPersonal Codex stays separate.",
+            "Private Amber login.\nCodex stays separate\nEnter opens browser.",
+            "Enter log in",
+        ),
+        SignInState::Starting => (
+            "Opening your browser...\nPlease wait.",
+            "Opening browser...\nPlease wait.",
+            "Starting login...",
+        ),
+        SignInState::Waiting => (
+            "Finish in your browser.\nAmber continues automatically.",
+            "Finish in browser.\nAmber auto-resumes.",
+            "Enter restart",
+        ),
+        // Backend errors can contain callback URLs or credentials. Only safe,
+        // actionable English copy belongs on the login screen.
+        SignInState::Failed(_) => (
+            "Login didn't finish.\nTry again, or check setup:\namber-shell doctor",
+            "Login didn't finish.\namber-shell doctor",
+            "Enter retry",
+        ),
+    };
+    let full_rows = sign_in_rows(full, text_width);
+    let mut rows = if full_rows.len() + 6 <= area.height as usize && !tiny {
+        full_rows
+    } else {
+        sign_in_rows(short, text_width)
+    };
+    if tiny && !matches!(state, SignInState::Required | SignInState::Starting) {
+        rows.extend(sign_in_rows(action, text_width));
+    }
+    let height = if tiny {
+        area.height
+    } else {
+        area.height.min((rows.len() + 6).max(9) as u16)
+    };
+    let bounds = Rect::new(area.x, area.y, area.width, height);
+    let indexed = std::env::var("TERM")
+        .unwrap_or_default()
+        .contains("256color");
+    let base = if app.no_color {
+        Style::default()
+    } else {
+        Style::default().fg(if indexed {
+            Color::Indexed(252)
+        } else {
+            Color::White
+        })
+    };
+    let muted = if app.no_color {
+        base
+    } else {
+        base.fg(if indexed {
+            Color::Indexed(248)
+        } else {
+            Color::Gray
+        })
+    };
+    let amber = if app.no_color {
+        base.add_modifier(Modifier::BOLD)
+    } else {
+        base.fg(if indexed {
+            Color::Indexed(223)
+        } else {
+            Color::Yellow
+        })
+        .add_modifier(Modifier::BOLD)
+    };
+    let accent = if app.no_color {
+        base.add_modifier(Modifier::BOLD | Modifier::REVERSED)
+    } else {
+        amber.fg(Color::Black).bg(if indexed {
+            Color::Indexed(223)
+        } else {
+            Color::Yellow
+        })
+    };
+    frame.render_widget(Paragraph::new("").style(base), bounds);
+    let animated = matches!(state, SignInState::Starting | SignInState::Waiting);
+    let mark = if matches!(state, SignInState::Failed(_)) {
+        "!"
+    } else if app.ascii {
+        if animated {
+            [".", "o", "O", "o"][app.indicator_frame]
+        } else {
+            "."
+        }
+    } else if animated {
+        ["◇", "◈", "◆", "◈"][app.indicator_frame]
+    } else {
+        "◇"
+    };
+    let mark_style = if animated && !app.no_color {
+        if indexed {
+            amber.fg(Color::Indexed([179, 180, 222, 180][app.indicator_frame]))
+        } else if app.indicator_frame == 0 || app.indicator_frame == 3 {
+            amber.add_modifier(Modifier::DIM)
+        } else {
+            amber
+        }
+    } else {
+        amber
+    };
+    frame.render_widget(
+        Paragraph::new(mark).style(mark_style),
+        Rect::new(area.x + 1, area.y, 1, 1),
+    );
+    let wordmark = if compact { "amber" } else { " amber " };
+    frame.render_widget(
+        Paragraph::new(wordmark).style(accent),
+        Rect::new(area.x + 3, area.y, wordmark.width() as u16, 1),
+    );
+    let body_y = area.y + if tiny { 1 } else { 2 };
+    let button_y = bounds.bottom() - if tiny { 2 } else { 3 };
+    frame.render_widget(
+        Paragraph::new(
+            rows.into_iter()
+                .map(|row| Line::from(row.text))
+                .collect::<Vec<_>>(),
+        )
+        .style(base),
+        Rect::new(text_x, body_y, text_width, button_y.saturating_sub(body_y)),
+    );
+    frame.render_widget(
+        Paragraph::new("Log in with ChatGPT").style(if matches!(state, SignInState::Starting) {
+            muted.add_modifier(Modifier::BOLD)
+        } else {
+            accent
+        }),
+        Rect::new(text_x, button_y, 19, 1),
+    );
+    if !tiny {
+        frame.render_widget(
+            Paragraph::new(action).style(muted),
+            Rect::new(text_x, button_y + 1, text_width, 1),
+        );
+    }
+    frame.render_widget(
+        Paragraph::new("Esc/Ctrl-C cancel").style(muted),
+        Rect::new(text_x, bounds.bottom() - 1, text_width, 1),
+    );
+    frame.set_cursor_position((text_x, button_y));
+    app.cursor_row = button_y;
+}
+
 pub fn render(frame: &mut Frame, app: &mut App) {
     let mut area = frame.area();
     if area.width < 24 || area.height < 6 {
         frame.render_widget(Paragraph::new("Enlarge window | Esc back"), area);
         frame.set_cursor_position((area.x, area.y));
         app.cursor_row = area.y;
+        return;
+    }
+    if app.sign_in.is_some() {
+        render_sign_in(frame, app);
         return;
     }
     let mut content = String::new();

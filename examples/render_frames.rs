@@ -1,6 +1,6 @@
 //! Deterministic snapshots of the actual Ratatui renderer, not native screenshots.
 use amber_shell::{
-    model::{App, Reply, Turn},
+    model::{App, Reply, SignInState, Turn},
     provider::ModelInfo,
     ui,
 };
@@ -25,8 +25,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         (40, 6),
         (24, 14),
         (24, 9),
+        (24, 6),
     ] {
         for state in [
+            "signin",
+            "signin-starting",
+            "signin-waiting",
+            "signin-error",
             "context",
             "start",
             "waiting",
@@ -79,6 +84,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             app.context_counts =
                 std::array::from_fn(|i| (payloads[i].files.len(), payloads[i].commands.len()));
             app.context_folder = "amber-project".into();
+            app.sign_in = match state {
+                "signin" => Some(SignInState::Required),
+                "signin-starting" => Some(SignInState::Starting),
+                "signin-waiting" => Some(SignInState::Waiting),
+                "signin-error" => Some(SignInState::Failed("Login did not finish".into())),
+                _ => None,
+            };
             if state == "context" {
                 app.context_choice = 3;
             }

@@ -102,6 +102,14 @@ pub enum AnswerStatus {
     Error,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum SignInState {
+    Required,
+    Starting,
+    Waiting,
+    Failed(String),
+}
+
 struct ContextSource {
     cwd: std::path::PathBuf,
     snapshot: crate::context::Context,
@@ -115,6 +123,7 @@ pub struct App {
     pub shell_commands: Vec<String>,
     pub history_cwd: Option<std::path::PathBuf>,
     pub active: bool,
+    pub sign_in: Option<SignInState>,
     pub selected: Option<usize>,
     pub manual_selection: bool,
     pub command_focus: bool,
@@ -158,6 +167,7 @@ impl App {
             shell_commands: vec![],
             history_cwd: None,
             active: false,
+            sign_in: None,
             selected: None,
             manual_selection: false,
             command_focus: false,
@@ -324,6 +334,13 @@ impl App {
         format!("{} · Ctrl-K Context", self.context_mode().label())
     }
     pub fn answer_status(&self) -> AnswerStatus {
+        if let Some(state) = &self.sign_in {
+            return match state {
+                SignInState::Required => AnswerStatus::Ready,
+                SignInState::Starting | SignInState::Waiting => AnswerStatus::Waiting,
+                SignInState::Failed(_) => AnswerStatus::Error,
+            };
+        }
         if self.active {
             if self.turns.last().is_some_and(|t| !t.stream.is_empty()) {
                 AnswerStatus::Streaming
@@ -339,7 +356,11 @@ impl App {
         }
     }
     pub fn advance_indicator(&mut self) -> bool {
-        if !self.active || self.reduced_motion {
+        let signing_in = matches!(
+            self.sign_in,
+            Some(SignInState::Starting | SignInState::Waiting)
+        );
+        if (!self.active && !signing_in) || self.reduced_motion {
             return false;
         }
         self.indicator_frame = (self.indicator_frame + 1) % 4;
@@ -372,6 +393,9 @@ impl App {
             as usize;
     }
     pub fn begin(&mut self) -> Result<(String, Vec<(String, String)>), String> {
+        if self.sign_in.is_some() {
+            return Err("Log in with ChatGPT to continue".into());
+        }
         if self.active {
             return Err("Answer still in progress".into());
         }

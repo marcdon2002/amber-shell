@@ -270,3 +270,62 @@ fn automatic_context_selects_compact_nested_npm_scripts_only_for_project_questio
     assert!(!context.contains("OMIT_DESCRIPTION"));
     assert!(context.len() < 4096);
 }
+
+#[test]
+fn sign_in_blocks_requests_without_consuming_the_draft_or_creating_a_turn() {
+    use amber_shell::model::SignInState;
+    let mut app = App::new(std::array::from_fn(|_| String::new()), false);
+    assert_eq!(app.sign_in, None);
+    app.editor.insert("Keep this question 👩‍💻");
+    app.editor.left();
+    let cursor = app.editor.cursor;
+    for state in [
+        SignInState::Required,
+        SignInState::Starting,
+        SignInState::Waiting,
+        SignInState::Failed("Login did not finish".into()),
+    ] {
+        app.sign_in = Some(state);
+        assert!(app.begin().is_err());
+        assert_eq!(app.editor.text, "Keep this question 👩‍💻");
+        assert_eq!(app.editor.cursor, cursor);
+        assert!(app.turns.is_empty());
+        assert!(!app.active);
+    }
+    app.sign_in = None;
+    let (question, conversation) = app.begin().unwrap();
+    assert_eq!(question, "Keep this question 👩‍💻");
+    assert!(conversation.is_empty());
+    assert_eq!(app.turns.len(), 1);
+}
+
+#[test]
+fn sign_in_animates_only_while_starting_or_waiting_and_honors_reduced_motion() {
+    use amber_shell::model::{AnswerStatus, SignInState};
+    let mut app = App::new(std::array::from_fn(|_| String::new()), false);
+    app.reduced_motion = false;
+    for (state, status, animated) in [
+        (SignInState::Required, AnswerStatus::Ready, false),
+        (SignInState::Starting, AnswerStatus::Waiting, true),
+        (SignInState::Waiting, AnswerStatus::Waiting, true),
+        (
+            SignInState::Failed("Cancelled".into()),
+            AnswerStatus::Error,
+            false,
+        ),
+    ] {
+        app.sign_in = Some(state);
+        app.indicator_frame = 0;
+        assert_eq!(app.answer_status(), status);
+        assert_eq!(app.advance_indicator(), animated);
+        assert_eq!(app.indicator_frame, usize::from(animated));
+        assert!(app.turns.is_empty());
+    }
+    app.sign_in = Some(SignInState::Waiting);
+    app.reduced_motion = true;
+    app.indicator_frame = 0;
+    assert!(!app.advance_indicator());
+    assert_eq!(app.indicator_frame, 0);
+    app.sign_in = None;
+    assert_eq!(app.answer_status(), AnswerStatus::Ready);
+}

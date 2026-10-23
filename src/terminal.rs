@@ -1,5 +1,5 @@
 use crate::{
-    model::App,
+    model::{App, SignInState},
     provider::{self, ProviderEvent, ProviderHandle, ProviderRequest},
     ui,
 };
@@ -180,12 +180,53 @@ pub fn run(mut app: App, simulated: bool) -> Result<Option<String>, String> {
     let mut term = fixed(guard.area).map_err(|e| e.to_string())?;
     let mut provider: Option<ProviderHandle> = None;
     let mut catalog: Option<CatalogJob> = None;
+    let mut login: Option<provider::LoginHandle> = None;
     let mut dirty = true;
     let mut last_draw = Instant::now() - Duration::from_secs(1);
     let mut last_pulse = Instant::now();
     loop {
         if INTERRUPTED.load(Ordering::SeqCst) {
             return Ok(None);
+        }
+        if let Some(handle) = login.as_ref() {
+            let mut finished = false;
+            loop {
+                let event = match handle.events.try_recv() {
+                    Ok(event) => event,
+                    Err(mpsc::TryRecvError::Empty) => break,
+                    Err(mpsc::TryRecvError::Disconnected) => {
+                        app.sign_in = Some(SignInState::Failed(
+                            "Sign-in stopped. Please try again.".into(),
+                        ));
+                        finished = true;
+                        dirty = true;
+                        break;
+                    }
+                };
+                match event {
+                    provider::LoginEvent::Waiting => {
+                        app.sign_in = Some(SignInState::Waiting);
+                    }
+                    provider::LoginEvent::Complete => {
+                        app.sign_in = None;
+                        app.models.clear();
+                        app.model_error.clear();
+                        app.status.clear();
+                        finished = true;
+                    }
+                    provider::LoginEvent::Error(error) => {
+                        app.sign_in = Some(SignInState::Failed(error));
+                        finished = true;
+                    }
+                }
+                dirty = true;
+                if finished {
+                    break;
+                }
+            }
+            if finished {
+                login.take();
+            }
         }
         if let Some(result) = catalog.as_ref().and_then(|job| job.events.try_recv().ok()) {
             app.model_loading = false;
@@ -200,6 +241,7 @@ pub fn run(mut app: App, simulated: bool) -> Result<Option<String>, String> {
                         app.model_error = "No models available. Ctrl-O reloads.".into();
                     }
                 }
+                Err(error) if error == provider::LOGIN_REQUIRED_ERROR => require_sign_in(&mut app),
                 Err(error) => app.model_error = error,
             }
             catalog.take();
@@ -244,7 +286,11 @@ pub fn run(mut app: App, simulated: bool) -> Result<Option<String>, String> {
                         break;
                     }
                     Ok(ProviderEvent::Error(e)) => {
-                        app.fail(e);
+                        if e == provider::LOGIN_REQUIRED_ERROR {
+                            require_sign_in(&mut app);
+                        } else {
+                            app.fail(e);
+                        }
                         dirty = true;
                         finished = true;
                         break;
@@ -279,7 +325,7 @@ pub fn run(mut app: App, simulated: bool) -> Result<Option<String>, String> {
         // TTY events wake immediately; only asynchronous model/catalog activity needs frequent polling.
         let poll_interval = if dirty {
             Duration::from_millis(16)
-        } else if app.active || catalog.is_some() {
+        } else if app.active || catalog.is_some() || login.is_some() {
             Duration::from_millis(32)
         } else {
             Duration::from_millis(250)
@@ -307,7 +353,7 @@ pub fn run(mut app: App, simulated: bool) -> Result<Option<String>, String> {
                 term = fixed(guard.area).map_err(|e| e.to_string())?;
                 dirty = true;
             }
-            Event::Paste(text) if !app.reviewing && !app.model_picker => {
+            Event::Paste(text) if app.sign_in.is_none() && !app.reviewing && !app.model_picker => {
                 app.leave_history();
                 if !app.editor.insert(&text) {
                     app.status = "Input exceeds 8 KiB; paste discarded".into();
@@ -320,6 +366,9 @@ pub fn run(mut app: App, simulated: bool) -> Result<Option<String>, String> {
                     return Ok(None);
                 }
                 if key.code == KeyCode::Esc {
+                    if app.sign_in.is_some() {
+                        return Ok(None);
+                    }
                     if app.model_picker {
                         app.model_picker = false;
                         dirty = true;
@@ -333,6 +382,18 @@ pub fn run(mut app: App, simulated: bool) -> Result<Option<String>, String> {
                         continue;
                     }
                     return Ok(None);
+                }
+                if app.sign_in.is_some() {
+                    if key.code == KeyCode::Enter
+                        && !matches!(app.sign_in, Some(SignInState::Starting))
+                    {
+                        login.take();
+                        app.sign_in = Some(SignInState::Starting);
+                        app.indicator_frame = 0;
+                        login = Some(provider::start_login());
+                        dirty = true;
+                    }
+                    continue;
                 }
                 if ctrl && key.code == KeyCode::Char('k') {
                     app.reviewing = !app.reviewing;
@@ -542,6 +603,23 @@ pub fn run(mut app: App, simulated: bool) -> Result<Option<String>, String> {
             _ => {}
         }
     }
+}
+
+fn require_sign_in(app: &mut App) {
+    if app.active {
+        if let Some(turn) = app.turns.pop()
+            && app.editor.text.is_empty()
+        {
+            app.editor.insert(&turn.question);
+        }
+        app.active = false;
+    }
+    app.sign_in = Some(SignInState::Required);
+    app.model_picker = false;
+    app.model_loading = false;
+    app.reviewing = false;
+    app.command_focus = false;
+    app.status.clear();
 }
 
 fn insert_input(app: &mut App, text: &str) {

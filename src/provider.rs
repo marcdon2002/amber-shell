@@ -17,6 +17,8 @@ use std::{
 };
 
 pub const DEFAULT_MODEL: &str = "gpt-6-luna";
+pub const LOGIN_REQUIRED_ERROR: &str =
+    "Amber requires its own ChatGPT login: amber-shell login. API key login is not supported.";
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ModelInfo {
@@ -89,6 +91,183 @@ impl Drop for ProviderHandle {
         if let Some(worker) = self.worker.take() {
             let _ = worker.join();
         }
+    }
+}
+
+/// Browser URLs and account details stay inside the worker, never in UI events.
+#[derive(Debug)]
+pub enum LoginEvent {
+    Waiting,
+    Complete,
+    Error(String),
+}
+
+pub struct LoginHandle {
+    pub events: Receiver<LoginEvent>,
+    pub cancel: Arc<AtomicBool>,
+    worker: Option<JoinHandle<()>>,
+}
+
+impl Drop for LoginHandle {
+    fn drop(&mut self) {
+        self.cancel.store(true, Ordering::Release);
+        if let Some(worker) = self.worker.take() {
+            let _ = worker.join();
+        }
+    }
+}
+
+pub fn start_login() -> LoginHandle {
+    let program =
+        std::env::var_os("AMBER_CODEX_BIN").unwrap_or_else(|| "/opt/homebrew/bin/codex".into());
+    let opener = std::env::var_os("AMBER_BROWSER_BIN").unwrap_or_else(|| "/usr/bin/open".into());
+    start_login_with_program(Path::new(&program), Path::new(&opener))
+}
+
+/// Alternate executables allow exercising the complete handshake without real accounts.
+pub fn start_login_with_program(program: &Path, opener: &Path) -> LoginHandle {
+    let (tx, events) = mpsc::channel();
+    let cancel = Arc::new(AtomicBool::new(false));
+    let flag = cancel.clone();
+    let program = program.to_path_buf();
+    let opener = opener.to_path_buf();
+    let worker = thread::spawn(move || {
+        if let Err(error) = login(&program, &opener, &tx, &flag)
+            && !flag.load(Ordering::Acquire)
+        {
+            let _ = tx.send(LoginEvent::Error(error));
+        }
+    });
+    LoginHandle {
+        events,
+        cancel,
+        worker: Some(worker),
+    }
+}
+
+fn validate_login_url(url: &str) -> Result<(), String> {
+    if url.len() > 8192
+        || url
+            .chars()
+            .any(|character| character.is_control() || character.is_whitespace())
+        || !(url.starts_with("https://auth.openai.com/") || url.starts_with("https://chatgpt.com/"))
+    {
+        return Err("Codex returned an invalid browser login address.".into());
+    }
+    Ok(())
+}
+
+/// A launcher has its own process group so cancellation only kills this invocation.
+struct BrowserLauncher {
+    child: Child,
+    exited: bool,
+}
+impl Drop for BrowserLauncher {
+    fn drop(&mut self) {
+        if !self.exited {
+            unsafe {
+                libc::kill(-(self.child.id() as i32), libc::SIGKILL);
+            }
+            let _ = self.child.kill();
+        }
+        let _ = self.child.wait();
+    }
+}
+
+fn open_login_browser(opener: &Path, url: &str, cancel: &AtomicBool) -> Result<(), String> {
+    validate_login_url(url)?;
+    if cancel.load(Ordering::Acquire) {
+        return Err("Cancelled.".into());
+    }
+    let child = Command::new(opener)
+        .arg(url)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .process_group(0)
+        .spawn()
+        .map_err(|_| "Could not open the login browser. Check AMBER_BROWSER_BIN.")?;
+    let mut launcher = BrowserLauncher {
+        child,
+        exited: false,
+    };
+    let deadline = Instant::now() + Duration::from_secs(5);
+    loop {
+        if cancel.load(Ordering::Acquire) {
+            return Err("Cancelled.".into());
+        }
+        match launcher.child.try_wait() {
+            Ok(Some(status)) => {
+                launcher.exited = true;
+                return if status.success() {
+                    Ok(())
+                } else {
+                    Err("Could not open the login browser.".into())
+                };
+            }
+            Ok(None) => {}
+            Err(_) => return Err("Could not check the login browser launcher.".into()),
+        }
+        if Instant::now() >= deadline {
+            return Err("The login browser launcher timed out. Please try again.".into());
+        }
+        thread::sleep(POLL);
+    }
+}
+
+fn login(
+    program: &Path,
+    opener: &Path,
+    tx: &Sender<LoginEvent>,
+    cancel: &Arc<AtomicBool>,
+) -> Result<(), String> {
+    let (_directory, mut client) = initialize(program, cancel)?;
+    let response = client.rpc(
+        "account/login/start",
+        json!({"type":"chatgpt","useHostedLoginSuccessPage":true,"appBrand":"chatgpt"}),
+        cancel,
+    )?;
+    let login_id = response
+        .get("loginId")
+        .and_then(Value::as_str)
+        .filter(|id| !id.is_empty() && id.len() <= 256 && !id.chars().any(char::is_control))
+        .ok_or("Codex did not provide a valid browser login session.")?;
+    let url = response
+        .get("authUrl")
+        .and_then(Value::as_str)
+        .ok_or("Codex did not provide a browser login address.")?;
+    open_login_browser(opener, url, cancel)?;
+    tx.send(LoginEvent::Waiting).map_err(|_| "Login closed.")?;
+    let deadline = Instant::now() + Duration::from_secs(5 * 60);
+    loop {
+        if cancel.load(Ordering::Acquire) {
+            return Err("Cancelled.".into());
+        }
+        if Instant::now() >= deadline {
+            return Err("ChatGPT login timed out. Please try again.".into());
+        }
+        let event = match client.pending.pop_front() {
+            Some(event) => event,
+            None => client.read(cancel, deadline)?,
+        };
+        if event.get("method").and_then(Value::as_str) != Some("account/login/completed")
+            || event.pointer("/params/loginId").and_then(Value::as_str) != Some(login_id)
+        {
+            continue;
+        }
+        if event.pointer("/params/success").and_then(Value::as_bool) != Some(true) {
+            return Err("ChatGPT login did not complete. Please try again.".into());
+        }
+        let account = client.rpc("account/read", json!({"refreshToken":false}), cancel)?;
+        require_chatgpt_account(&account)?;
+        if !crate::auth::has_credentials()? {
+            return Err("Codex did not save Amber's ChatGPT login. Please try again.".into());
+        }
+        if cancel.load(Ordering::Acquire) {
+            return Err("Cancelled.".into());
+        }
+        tx.send(LoginEvent::Complete).map_err(|_| "Login closed.")?;
+        return Ok(());
     }
 }
 
@@ -505,7 +684,10 @@ impl Client {
             if value
                 .get("method")
                 .and_then(Value::as_str)
-                .is_some_and(|m| m.starts_with("item/") || m == "turn/completed")
+                .is_some_and(|m| {
+                    m.starts_with("item/")
+                        || matches!(m, "turn/completed" | "account/login/completed")
+                })
             {
                 if self.pending.len() >= 16 {
                     return Err("Codex event limit reached before request acknowledgement.".into());
@@ -540,6 +722,24 @@ fn connect(
     program: &Path,
     cancel: &Arc<AtomicBool>,
 ) -> Result<(tempfile::TempDir, Client), String> {
+    let (directory, mut client) = initialize(program, cancel)?;
+    let account = client.rpc("account/read", json!({"refreshToken":false}), cancel)?;
+    require_chatgpt_account(&account)?;
+    Ok((directory, client))
+}
+
+fn require_chatgpt_account(account: &Value) -> Result<(), String> {
+    if account.pointer("/account/type").and_then(Value::as_str) != Some("chatgpt") {
+        return Err(LOGIN_REQUIRED_ERROR.into());
+    }
+    Ok(())
+}
+
+/// Authentication starts only after the same isolation checks used by model requests.
+fn initialize(
+    program: &Path,
+    cancel: &Arc<AtomicBool>,
+) -> Result<(tempfile::TempDir, Client), String> {
     let directory = tempfile::Builder::new()
         .prefix("amber-codex-")
         .tempdir()
@@ -564,10 +764,6 @@ fn connect(
     client
         .process
         .send(&json!({"method":"initialized","params":{}}), cancel)?;
-    let account = client.rpc("account/read", json!({"refreshToken":false}), cancel)?;
-    if account.pointer("/account/type").and_then(Value::as_str) != Some("chatgpt") {
-        return Err("Amber requires its own ChatGPT login: amber-shell login. API key login is not supported.".into());
-    }
     let effective = client.rpc("config/read", json!({"includeLayers":false}), cancel)?;
     if let Some(servers) = effective
         .pointer("/config/mcp_servers")

@@ -215,6 +215,13 @@ fn entry() -> Result<i32, String> {
     app.model_id = settings.model;
     app.fast = settings.fast;
     app.set_context_choice(settings.context.choice());
+    if !simulated {
+        app.sign_in = match amber_shell::auth::has_credentials() {
+            Ok(true) => None,
+            Ok(false) => Some(amber_shell::model::SignInState::Required),
+            Err(error) => Some(amber_shell::model::SignInState::Failed(error)),
+        };
+    }
     match terminal::run(app, simulated)? {
         Some(command) => {
             validate_command(&command)?;
