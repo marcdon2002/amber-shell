@@ -1,72 +1,150 @@
 #!/bin/sh
-# Installs the chosen binary, two shell files and marked zshenv/zshrc blocks.
+# Install files, or configure an existing Homebrew package without copying it.
 set -eu
 repo_dir=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 prefix="${HOME}/.local"
 zshrc="${ZDOTDIR:-$HOME}/.zshrc"
 zshenv="${ZDOTDIR:-$HOME}/.zshenv"
 binary="$repo_dir/target/release/amber-shell"
+shell_only=0
+migrate=0
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --prefix|--zshrc|--zshenv|--binary)
       [ "$#" -ge 2 ] || { printf '%s\n' 'Missing option value' >&2; exit 2; }
       case "$1" in --prefix) prefix=$2;; --zshrc) zshrc=$2;; --zshenv) zshenv=$2;; --binary) binary=$2;; esac
       shift 2;;
+    --shell-only) shell_only=1; shift;;
+    --migrate) migrate=1; shift;;
     *) printf '%s\n' "Unknown argument: $1" >&2; exit 2;;
   esac
 done
-[ -x "$binary" ] || { printf '%s\n' "Build a release binary first: $binary" >&2; exit 1; }
-for config_path in "$zshenv" "$zshrc"; do
-  [ ! -e "$config_path" ] || [ -f "$config_path" ] || { printf '%s\n' 'Shell config must be a regular file.' >&2; exit 1; }
-done
-[ ! -L "$zshenv" ] || { printf '%s\n' 'Refusing to rewrite a symlinked zshenv; use --zshenv with its resolved file.' >&2; exit 1; }
-[ ! -L "$zshrc" ] || { printf '%s\n' 'Refusing to rewrite a symlinked zshrc; install with --zshrc targeting its resolved file.' >&2; exit 1; }
-# Restrict paths used in the quoted shell setup; never construct executable input from them.
 case "$prefix" in *"'"*|*'
 '*) printf '%s\n' 'Installation prefix must not contain quotes or newlines.' >&2; exit 2;; esac
-mkdir -p "$prefix/bin" "$prefix/share/amber-shell" "$(dirname -- "$zshrc")" "$(dirname -- "$zshenv")"
-install -m 755 "$binary" "$prefix/bin/amber-shell"
-install -m 644 "$repo_dir/shell/amber-shell.zsh" "$prefix/share/amber-shell/amber-shell.zsh"
-install -m 644 "$repo_dir/shell/amber-session.zsh" "$prefix/share/amber-shell/amber-session.zsh"
-# Prepending makes personal startup files run only in the inner shell, once.
-capture_begin='# >>> amber-shell capture >>>'
-capture_end='# <<< amber-shell capture <<<'
-if [ -f "$zshenv" ] && grep -Fqx "$capture_begin" "$zshenv"; then
-  grep -Fqx "$capture_end" "$zshenv" || { printf '%s\n' 'Incomplete capture block; inspect zshenv.' >&2; exit 1; }
-  grep -Fqx "source '$prefix/share/amber-shell/amber-session.zsh' '$prefix/bin/amber-shell'" "$zshenv" || { printf '%s\n' 'Existing capture block uses another prefix.' >&2; exit 1; }
+if [ "$shell_only" -eq 1 ]; then
+  [ -x "$prefix/bin/amber-shell" ] &&
+    [ -f "$prefix/share/amber-shell/amber-shell.zsh" ] &&
+    [ -f "$prefix/share/amber-shell/amber-session.zsh" ] || {
+      printf '%s\n' 'Installed package is incomplete; reinstall it before setup.' >&2; exit 1;
+    }
 else
-  if [ -f "$zshenv" ]; then
-    cp -p "$zshenv" "$zshenv.amber-backup-$(date +%Y%m%d-%H%M%S)-$$"
+  [ -x "$binary" ] || { printf '%s\n' "Build a release binary first: $binary" >&2; exit 1; }
+fi
+[ "$zshenv" != "$zshrc" ] || { printf '%s\n' 'zshenv and zshrc must be different files.' >&2; exit 1; }
+for config_path in "$zshenv" "$zshrc"; do
+  [ ! -L "$config_path" ] || { printf '%s\n' 'Use --zshenv/--zshrc with resolved targets of symlinked startup files.' >&2; exit 1; }
+  [ ! -e "$config_path" ] || [ -f "$config_path" ] || { printf '%s\n' 'Shell config must be a regular file.' >&2; exit 1; }
+done
+
+block_markers() {
+  if [ "$1" = capture ]; then
+    begin='# >>> amber-shell capture >>>'
+    end='# <<< amber-shell capture <<<'
+  else
+    begin='# >>> amber-shell >>>'
+    end='# <<< amber-shell <<<'
   fi
-  env_temp=$(mktemp "$zshenv.amber.XXXXXXXX")
-  chmod 600 "$env_temp"
-  {
-    printf '%s\n' "$capture_begin"
-    printf "source '%s/share/amber-shell/amber-session.zsh' '%s/bin/amber-shell'\n" "$prefix" "$prefix"
-    printf '%s\n' "$capture_end"
-    [ ! -f "$zshenv" ] || cat "$zshenv"
-  } > "$env_temp"
-  mv -f "$env_temp" "$zshenv"
-fi
-begin='# >>> amber-shell >>>'
-end='# <<< amber-shell <<<'
-# Avoid updating an existing marked block silently (including a changed prefix).
-if [ -f "$zshrc" ] && grep -Fqx "$begin" "$zshrc"; then
-  grep -Fqx "$end" "$zshrc" || { printf '%s\n' 'Incomplete amber-shell block; inspect zshrc before retrying.' >&2; exit 1; }
-  expected="source '$prefix/share/amber-shell/amber-shell.zsh'"
-  grep -Fqx "$expected" "$zshrc" || { printf '%s\n' 'Existing amber-shell block uses another prefix; left unchanged.' >&2; exit 1; }
-  printf '%s\n' 'Binary/plugin updated; existing zshrc block preserved.'
-  exit 0
-fi
-if [ -f "$zshrc" ]; then
-  backup="$zshrc.amber-backup-$(date +%Y%m%d-%H%M%S)-$$"
-  cp -p "$zshrc" "$backup"
-  printf 'Backup: %s\n' "$backup"
-fi
-{
-  printf '\n%s\n' "$begin"
-  printf "export AMBER_SHELL_BIN='%s/bin/amber-shell'\n" "$prefix"
-  printf "source '%s/share/amber-shell/amber-shell.zsh'\n" "$prefix"
+}
+render_block() {
+  block_markers "$1"
+  printf '%s\n' "$begin"
+  if [ "$1" = capture ]; then
+    printf "source '%s/share/amber-shell/amber-session.zsh' '%s/bin/amber-shell'\n" "$2" "$2"
+  else
+    printf "export AMBER_SHELL_BIN='%s/bin/amber-shell'\n" "$2"
+    printf "source '%s/share/amber-shell/amber-shell.zsh'\n" "$2"
+  fi
   printf '%s\n' "$end"
-} >> "$zshrc"
-printf '%s\n' 'Installed. Open a new zsh session, then press Ctrl-X followed by Ctrl-A.'
+}
+inspect_block() {
+  block_markers "$2"
+  if [ -f "$1" ]; then
+    awk -v begin="$begin" -v end="$end" '
+      { normalized=$0; sub(/^[[:space:]]+/, "", normalized); sub(/[[:space:]]+$/, "", normalized) }
+      (normalized == begin || normalized == end) && normalized != $0 { exit 1 }
+    ' "$1" || { printf 'Modified Amber markers in %s; left unchanged.\n' "$1" >&2; return 1; }
+  fi
+  if [ ! -f "$1" ] || ! grep -Fqx -e "$begin" -e "$end" "$1"; then
+    printf '%s\n' new
+    return
+  fi
+  existing=$(awk -v begin="$begin" -v end="$end" '
+    $0 == begin { if (seen++ || inside) exit 1; inside=1 }
+    $0 == end { if (!inside || ended++) exit 1; print; inside=0; next }
+    inside { print }
+    END { if (seen != 1 || ended != 1 || inside) exit 1 }
+  ' "$1") || { printf 'Malformed Amber block in %s; left unchanged.\n' "$1" >&2; return 1; }
+  if [ "$existing" = "$(render_block "$2" "$prefix")" ]; then
+    printf '%s\n' same
+    return
+  fi
+  [ "$migrate" -eq 1 ] || { printf 'Existing Amber block in %s uses another prefix; use --migrate.\n' "$1" >&2; return 1; }
+  old_path=$(printf '%s\n' "$existing" | awk -F "'" 'NR == 2 { print $2 }')
+  if [ "$2" = capture ]; then
+    old_prefix=${old_path%/share/amber-shell/amber-session.zsh}
+  else
+    old_prefix=${old_path%/bin/amber-shell}
+  fi
+  # Migrate only an exact block previously generated by this installer.
+  [ -n "$old_prefix" ] && [ "$existing" = "$(render_block "$2" "$old_prefix")" ] || {
+    printf 'Customized Amber block in %s; left unchanged.\n' "$1" >&2; return 1;
+  }
+  printf '%s\n' replace
+}
+# Validate both startup files before changing either one or any installed file.
+capture_action=$(inspect_block "$zshenv" capture)
+widget_action=$(inspect_block "$zshrc" widget)
+backup_config() {
+  if [ "$2" != same ] && [ -f "$1" ]; then
+    backup="$1.amber-backup-$(date +%Y%m%d-%H%M%S)-$$"
+    cp -p "$1" "$backup"
+    printf 'Backup: %s\n' "$backup"
+  fi
+}
+config_temp=''
+block_temp=''
+capture_temp=''
+widget_temp=''
+trap 'rm -f -- "$config_temp" "$block_temp" "$capture_temp" "$widget_temp"' EXIT HUP INT TERM
+stage_config() {
+  config_temp=''
+  [ "$3" != same ] || return 0
+  mkdir -p "$(dirname -- "$1")"
+  config_temp=$(mktemp "$1.amber.XXXXXXXX")
+  block_temp=$(mktemp "$1.amber-block.XXXXXXXX")
+  chmod 600 "$config_temp" "$block_temp"
+  render_block "$2" "$prefix" > "$block_temp"
+  block_markers "$2"
+  if [ "$3" = replace ]; then
+    awk -v begin="$begin" -v end="$end" -v block="$block_temp" '
+      $0 == begin { while ((getline line < block) > 0) print line; close(block); skip=1; next }
+      $0 == end { skip=0; next }
+      !skip { print }
+    ' "$1" > "$config_temp"
+  elif [ "$2" = capture ]; then
+    cat "$block_temp" > "$config_temp"
+    [ ! -f "$1" ] || cat "$1" >> "$config_temp"
+  else
+    [ ! -f "$1" ] || cat "$1" > "$config_temp"
+    printf '\n' >> "$config_temp"
+    cat "$block_temp" >> "$config_temp"
+  fi
+  rm -f "$block_temp"
+  block_temp=''
+}
+# Stage both writes successfully before replacing either startup file.
+stage_config "$zshenv" capture "$capture_action"
+capture_temp=$config_temp
+stage_config "$zshrc" widget "$widget_action"
+widget_temp=$config_temp
+if [ "$shell_only" -eq 0 ]; then
+  mkdir -p "$prefix/bin" "$prefix/share/amber-shell"
+  install -m 755 "$binary" "$prefix/bin/amber-shell"
+  install -m 644 "$repo_dir/shell/amber-shell.zsh" "$prefix/share/amber-shell/amber-shell.zsh"
+  install -m 644 "$repo_dir/shell/amber-session.zsh" "$prefix/share/amber-shell/amber-session.zsh"
+fi
+backup_config "$zshenv" "$capture_action"
+backup_config "$zshrc" "$widget_action"
+[ -z "$capture_temp" ] || mv -f "$capture_temp" "$zshenv"
+[ -z "$widget_temp" ] || mv -f "$widget_temp" "$zshrc"
+printf '%s\n' 'Configured. Open a new terminal window, then press Ctrl-X followed by Ctrl-A.'

@@ -38,6 +38,10 @@ fn main() {
 }
 fn entry() -> Result<i32, String> {
     let args: Vec<String> = std::env::args().skip(1).collect();
+    if args.first().is_some_and(|s| s == "--version" || s == "-V") {
+        println!("amber-shell {}", env!("CARGO_PKG_VERSION"));
+        return Ok(0);
+    }
     if args.first().is_some_and(|s| s == "session") {
         return match amber_shell::session::run(&args[1..]) {
             Ok(code) => Ok(code),

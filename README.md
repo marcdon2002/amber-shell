@@ -5,6 +5,7 @@ Ein kompakter Terminalassistent für **macOS, Apple Terminal und Zsh**: Frage st
 [![Rust](https://img.shields.io/badge/Rust-000000?style=for-the-badge&logo=rust&logoColor=white)](https://www.rust-lang.org/)
 [![Ratatui](https://img.shields.io/badge/Ratatui-F8C76D?style=for-the-badge&logoColor=171717)](https://ratatui.rs/)
 [![macOS ARM64](https://img.shields.io/badge/macOS-ARM64-20232A?style=for-the-badge&logo=apple&logoColor=white)](#installation)
+[![Homebrew](https://img.shields.io/badge/Homebrew-FBB040?style=for-the-badge&logo=homebrew&logoColor=171717)](https://github.com/marcdon2002/homebrew-tap)
 [![Zsh](https://img.shields.io/badge/Zsh-F15A24?style=for-the-badge&logo=zsh&logoColor=white)](https://www.zsh.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-F8C76D?style=for-the-badge)](./LICENSE)
 [![Codex](https://img.shields.io/badge/Codex-ChatGPT_Anmeldung-10A37F?style=for-the-badge)](#modellwahl)
@@ -30,18 +31,47 @@ Für die Ausgabeerfassung läuft pro Terminal ein kleiner Rust-Helfer, der im Le
 
 ## Installation
 
-**Voraussetzungen:** macOS auf Apple Silicon, Zsh, eine Rust-Toolchain gemäß [Cargo.toml](./Cargo.toml) und die offizielle Codex CLI mit ChatGPT-Anmeldung. Die vorhandene Oh-My-Zsh-Konfiguration kann weiterverwendet werden.
+**Voraussetzungen:** macOS 13 oder neuer auf Apple Silicon, Zsh und die offizielle Codex CLI mit ChatGPT-Anmeldung. Die vorhandene Oh-My-Zsh-Konfiguration kann weiterverwendet werden.
 
-Im Repository-Ordner ausführen:
+### Mit Homebrew
+
+```sh
+brew install marcdon2002/tap/amber-shell
+amber-shell-setup
+```
+
+Falls die offizielle Codex CLI noch fehlt:
+
+```sh
+brew install --cask codex
+amber-shell login
+```
+
+Eine bestehende Codex-Installation samt Anmeldung wird weiterverwendet. Danach ein **neues Terminalfenster** öffnen und **Ctrl-X, danach Ctrl-A** drücken.
+
+Homebrew lädt das fertige ARM64-Paket mit SHA256-Prüfung; eine Rust-Toolchain ist für die Installation nicht nötig. Die Distribution erfolgt über den eigenen [Homebrew-Tap](https://github.com/marcdon2002/homebrew-tap). Intel-Macs und Linux werden derzeit nicht als Homebrew-Paket angeboten.
+
+`amber-shell-setup` sichert vorhandene `.zshenv` und `.zshrc`, ergänzt die markierten Amber-Blöcke und kann die bisherige Installation unter `~/.local` übernehmen. Es ersetzt ausschließlich unveränderte, vom Installer erzeugte Blöcke; eigene Anpassungen und Symlinks benötigen eine bewusste Zuordnung. Die Einbindung verweist auf Homebrews stabilen `opt`-Pfad, damit Updates keine erneute Einrichtung brauchen. Das Setup startet keine Modellanfrage.
+
+Aktualisieren:
+
+```sh
+brew update
+brew upgrade marcdon2002/tap/amber-shell
+```
+
+Danach ein neues Terminalfenster öffnen. Zum Deinstallieren zuerst die beiden markierten Amber-Blöcke aus `.zshenv` und `.zshrc` entfernen, dann `brew uninstall amber-shell` ausführen. Lokale Einstellungen und Verlauf bleiben erhalten.
+
+### Aus dem Quellcode
+
+Mit einer Rust-Toolchain gemäß [Cargo.toml](./Cargo.toml) im Repository-Ordner:
 
 ```sh
 cargo build --release --locked
 sh scripts/install.sh
 ```
 
-Danach ein neues Terminalfenster öffnen und **Ctrl-X, danach Ctrl-A** drücken.
-
-Der Installer legt die Binary unter `~/.local/bin/amber-shell` und die beiden Shell-Dateien unter `~/.local/share/amber-shell/` ab. Ein früher Block in `.zshenv` startet die Ausgabeerfassung; `.zshrc` lädt das ZLE-Widget nach der Prompt-Konfiguration. Vor Änderungen an vorhandenen Konfigurationsdateien entstehen Sicherungen. Beide Ergänzungen sind klar markiert. Persönliche Zsh-Startdateien werden weiterhin einmal geladen; nichtinteraktive Shells und Skripte bleiben ohne Erfassungshelfer.
+Der Quellcode-Installer legt die Binary unter `~/.local/bin/amber-shell` und die Shell-Dateien unter `~/.local/share/amber-shell/` ab. Ein früher Block in `.zshenv` startet die Ausgabeerfassung; `.zshrc` lädt das ZLE-Widget nach der Prompt-Konfiguration. Persönliche Zsh-Startdateien werden weiterhin einmal geladen; nichtinteraktive Shells und Skripte bleiben ohne Erfassungshelfer.
 
 <details>
 <summary>Verlinkte Shell-Dateien oder abweichender Codex-Pfad</summary>
@@ -49,8 +79,9 @@ Der Installer legt die Binary unter `~/.local/bin/amber-shell` und die beiden Sh
 Bei einer verlinkten `.zshrc` oder `.zshenv` das jeweilige aufgelöste Ziel angeben; der Symlink bleibt erhalten:
 
 ```sh
-sh scripts/install.sh --zshrc /absoluter/pfad/zur/zshrc
+amber-shell-setup --zshrc /absoluter/pfad/zur/zshrc
 # Falls auch .zshenv verlinkt ist: zusätzlich --zshenv /absoluter/pfad/zur/zshenv
+# Quellcode-Installation: dieselben Optionen an sh scripts/install.sh übergeben.
 ```
 
 Standardmäßig liegt Codex unter `/opt/homebrew/bin/codex`. Für eine andere offizielle Installation vor dem Öffnen von Amber setzen:
@@ -195,6 +226,7 @@ Für eine Codeänderung:
 ```sh
 cargo fmt --check
 cargo clippy --all-targets --locked -- -D warnings
+python3 tests/install_e2e.py
 cargo test --locked
 ```
 
@@ -221,13 +253,28 @@ python3 scripts/render-demo.py --input work/product-demo/timeline.json
 
 Zwischendateien bleiben unter `work/`; nur die fertige Animation unter `assets/amber-demo.gif` wird versioniert.
 
+### Homebrew-Releases pflegen
+
+Der [Release-Packager](./scripts/package-release.py) erstellt auf einem ARM64-Mac ein Paket ausschließlich aus Binary, Shell-Integration, Installer und MIT-Lizenz. Er erzeugt außerdem `SHA256SUMS` und die passende `amber-shell.rb`. Die Binary muss zur Version in `Cargo.toml` passen.
+
+```sh
+MACOSX_DEPLOYMENT_TARGET=13.0 cargo build --release --locked
+python3 scripts/package-release.py
+(cd work/release && shasum -a 256 -c SHA256SUMS)
+```
+
+Nach den Tests den Stand committen und mit der passenden Version `vX.Y.Z` taggen. Das Archiv, `SHA256SUMS` und `amber-shell.rb` aus `work/release/` als Assets dieses GitHub-Releases veröffentlichen. Anschließend **die aus diesem Release erzeugte** Formel als `Formula/amber-shell.rb` im Tap aktualisieren. Dadurch stimmen Download und Prüfsumme überein; ein zusätzlicher Zugang zum Tap wird nicht im Amber-Repository hinterlegt.
+
+`brew audit --strict marcdon2002/tap/amber-shell` und `brew test marcdon2002/tap/amber-shell` prüfen das veröffentlichte Paket. Der Formulartest richtet die Shell nur in einem temporären Testordner ein.
+
 ## Hilfe
 
 Loginstatus und CLI-Version prüfen:
 
 ```sh
-~/.local/bin/amber-shell doctor
-~/.local/bin/amber-shell login
+amber-shell doctor
+amber-shell login
+# Quellcode-Installation ohne PATH-Eintrag: ~/.local/bin/amber-shell verwenden.
 ```
 
 Nach einem Update ein neues Terminalfenster öffnen, damit auch der Erfassungshelfer aktualisiert wird. Bei Problemen mit Netzwerk, Kontolimit oder Modellberechtigung bleibt die Shell-Eingabe erhalten. Kann die Ausgabeerfassung beim Start nicht eingerichtet werden, startet die normale Shell weiter.
