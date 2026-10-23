@@ -115,7 +115,11 @@ fn selects_named_child_and_workspace_manager_with_a_small_send_budget() {
     let index = ProjectIndex::discover(root);
     let files = index.select("npm customer-web dev");
     let body = text(&index, "npm customer-web dev");
-    assert!(body.contains("apps/customer-web/package.json"), "{body}");
+    assert!(
+        body.contains("apps/customer-web/package.json"),
+        "search limited={}; selected context:\n{body}",
+        index.limited
+    );
     assert!(body.contains("pnpm@10.0.0"));
     assert!(body.contains("pnpm-lock.yaml"));
     assert!(!body.contains("DO_NOT_SEND"));

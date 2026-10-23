@@ -257,7 +257,7 @@ Zwischendateien bleiben unter `work/`; nur die fertige Animation unter `assets/a
 
 ### Homebrew-Releases pflegen
 
-Der [Release-Workflow](./.github/workflows/release.yml) testet und baut Amber automatisch auf einem normalen ARM64-macOS-Runner, sobald ein Versions-Tag wie `v0.7.2` gepusht wird. Der Tag muss zur Version in `Cargo.toml` passen. Der Workflow verwendet ausschließlich synthetische Tests ohne Modellanfragen.
+Der [Release-Workflow](./.github/workflows/release.yml) testet und baut Amber automatisch auf einem normalen ARM64-macOS-Runner, sobald ein Versions-Tag wie `v0.7.3` gepusht wird. Der Tag muss zur Version in `Cargo.toml` passen. Der Workflow verwendet ausschließlich synthetische Tests ohne Modellanfragen.
 
 Nach dem Aktualisieren der Version in `Cargo.toml` und `Cargo.lock`, den lokalen Tests und dem Commit:
 
