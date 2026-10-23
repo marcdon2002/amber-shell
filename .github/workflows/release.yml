@@ -38,6 +38,8 @@ jobs:
           rustup toolchain install stable --profile minimal --component rustfmt,clippy
           rustup default stable
       - name: Check and build
+        env:
+          XDG_CONFIG_HOME: ${{ runner.temp }}/amber-test-config
         run: |
           cargo fmt --check
           # Project scans have a 150 ms budget; avoid competing test scans on the VM.

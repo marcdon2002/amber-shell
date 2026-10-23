@@ -10,6 +10,28 @@ use std::{
     path::PathBuf,
     time::{Duration, Instant},
 };
+mod cli_help;
+
+fn help(command: &str) {
+    let text = match command {
+        "login" => cli_help::LOGIN,
+        "logout" => cli_help::LOGOUT,
+        "doctor" => cli_help::DOCTOR,
+        "ask" => cli_help::ASK,
+        "session" => cli_help::SESSION,
+        _ => cli_help::MAIN,
+    };
+    println!("amber-shell {}\n\n{text}", env!("CARGO_PKG_VERSION"));
+}
+
+fn codex_status(program: &str, args: &[&str]) -> Result<i32, String> {
+    Ok(amber_shell::auth::command(std::path::Path::new(program))?
+        .args(args)
+        .status()
+        .map_err(|_| "Could not start Codex. Install it with brew install --cask codex, or set AMBER_CODEX_BIN.")?
+        .code()
+        .unwrap_or(1))
+}
 
 fn option(args: &[String], key: &str) -> Result<Option<String>, String> {
     match args.iter().position(|a| a == key) {
@@ -43,6 +65,10 @@ fn entry() -> Result<i32, String> {
         return Ok(0);
     }
     if args.first().is_some_and(|s| s == "session") {
+        if args.get(1).is_some_and(|s| s == "--help" || s == "-h") {
+            help("session");
+            return Ok(0);
+        }
         return match amber_shell::session::run(&args[1..]) {
             Ok(code) => Ok(code),
             Err(error) => amber_shell::session::fallback(&args[1..], &error),
@@ -51,34 +77,49 @@ fn entry() -> Result<i32, String> {
     let program =
         std::env::var("AMBER_CODEX_BIN").unwrap_or_else(|_| "/opt/homebrew/bin/codex".into());
     if args.iter().any(|s| s == "--help" || s == "-h") {
-        println!(
-            "amber-shell — compact assistant for zsh / Apple Terminal\n\nNo arguments: Inline chat with direct question input\n  --simulate                 Simulated replies, no network\n  --history-file PATH         NUL-separated shell commands (max. 32 KiB)\n  --capture-socket PATH       Bounded output from the current session\n  --result-file PATH          Original command + NUL, only on acceptance\n  session -- /bin/zsh -i      Start a shell with output capture\n  login                      Official codex login\n  doctor                     Codex version and official login status\n  ask --question TEXT         Noninteractive diagnostic, JSON reply\n      --model ID              Explicit model for this diagnostic\n      --fast                  Use the supported Fast tier\n      --context-file PATH     Explicitly selected context (max. 48 KiB)\n      --conversation-file P   JSON pairs of questions/replies\n\nKeys: Ctrl-X Ctrl-A opens the ZLE widget; Enter asks; Ctrl-Y accepts;\nEsc/Ctrl-C cancel; Tab and arrows browse/select; Ctrl-O selects model/Fast; Ctrl-K edits context.\nPress Enter at the normal shell prompt to execute the accepted command."
-        );
+        help(args.first().map_or("", String::as_str));
         return Ok(0);
     }
-    if args.first().is_some_and(|s| s == "login" || s == "doctor") {
-        let mut cmd = std::process::Command::new(program);
-        if args[0] == "doctor" {
-            let status = cmd.arg("--version").status().map_err(|e| e.to_string())?;
-            if !status.success() {
-                return Ok(1);
-            }
-            return Ok(std::process::Command::new(
-                std::env::var("AMBER_CODEX_BIN")
-                    .unwrap_or_else(|_| "/opt/homebrew/bin/codex".into()),
-            )
-            .args(["login", "status"])
-            .status()
-            .map_err(|e| e.to_string())?
-            .code()
-            .unwrap_or(1));
+    match args.first().map(String::as_str) {
+        Some("login") => {
+            return match args.get(1).map(String::as_str) {
+                None => {
+                    println!(
+                        "Log in with ChatGPT in your browser. This login belongs to Amber only."
+                    );
+                    codex_status(&program, &["login"])
+                }
+                Some("status") if args.len() == 2 => codex_status(&program, &["login", "status"]),
+                Some("--device-auth") if args.len() == 2 => {
+                    println!("Log in with ChatGPT using the browser link and device code below.");
+                    codex_status(&program, &["login", "--device-auth"])
+                }
+                _ => Err("Usage: amber-shell login [status | --device-auth]".into()),
+            };
         }
-        return Ok(cmd
-            .arg("login")
-            .status()
-            .map_err(|e| e.to_string())?
-            .code()
-            .unwrap_or(1));
+        Some("logout") => {
+            if args.len() != 1 {
+                return Err("Usage: amber-shell logout".into());
+            }
+            return codex_status(&program, &["logout"]);
+        }
+        Some("doctor") => {
+            if args.len() != 1 {
+                return Err("Usage: amber-shell doctor".into());
+            }
+            let code = codex_status(&program, &["--version"])?;
+            if code != 0 {
+                return Ok(code);
+            }
+            println!("Amber's separate ChatGPT login:");
+            return codex_status(&program, &["login", "status"]);
+        }
+        Some(first) if first != "ask" && !first.starts_with('-') => {
+            return Err(format!(
+                "Unknown command '{first}'. Run amber-shell --help."
+            ));
+        }
+        _ => {}
     }
     let simulated = args.iter().any(|s| s == "--simulate");
     if args.first().is_some_and(|s| s == "ask") {

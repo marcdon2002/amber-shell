@@ -1,8 +1,8 @@
 # amber-shell
 
-A compact terminal assistant for **macOS, Apple Terminal, and Zsh**: ask a question, read the explanation, and insert the suggested command into your editable shell prompt. Amber uses the official Codex CLI and your existing ChatGPT login.
+A compact terminal assistant for **macOS, Apple Terminal, and Zsh**: ask a question, read the explanation, and insert the suggested command into your editable shell prompt. Amber uses the official Codex CLI with its own **Log in with ChatGPT** flow.
 
-Amber's interface and default responses are in English. You can explicitly request a response in another language.
+Amber's interface stays in English. Replies follow the language of your current question; you can explicitly request a different response language.
 
 [![Rust](https://img.shields.io/badge/Rust-000000?style=for-the-badge&logo=rust&logoColor=white)](https://www.rust-lang.org/)
 [![Ratatui](https://img.shields.io/badge/Ratatui-F8C76D?style=for-the-badge&logoColor=171717)](https://ratatui.rs/)
@@ -10,9 +10,9 @@ Amber's interface and default responses are in English. You can explicitly reque
 [![Homebrew](https://img.shields.io/badge/Homebrew-FBB040?style=for-the-badge&logo=homebrew&logoColor=171717)](https://github.com/marcdon2002/homebrew-tap)
 [![Zsh](https://img.shields.io/badge/Zsh-F15A24?style=for-the-badge&logo=zsh&logoColor=white)](https://www.zsh.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-F8C76D?style=for-the-badge)](./LICENSE)
-[![Codex](https://img.shields.io/badge/Codex-ChatGPT_Login-10A37F?style=for-the-badge)](#model-selection)
+[![Codex](https://img.shields.io/badge/Codex-ChatGPT_Login-10A37F?style=for-the-badge)](#chatgpt-login)
 
-[Installation](#installation) · [Usage](#usage) · [Model selection](#model-selection) · [Repository structure](#repository-structure) · [Development](#development) · [Help](#help)
+[Installation](#installation) · [ChatGPT login](#chatgpt-login) · [Usage](#usage) · [Model selection](#model-selection) · [Repository structure](#repository-structure) · [Development](#development) · [Help](#help)
 
 > [!TIP]
 > **Ctrl-X, then Ctrl-A** opens Amber directly at the prompt. **Ctrl-Y** inserts the selected command. It only runs when you separately press **Enter in the shell**. Escape or Ctrl-C preserves your previous input and cursor position.
@@ -33,7 +33,7 @@ A small Rust helper runs for each terminal to capture output, waiting for events
 
 ## Installation
 
-**Requirements:** macOS 13 or later on Apple Silicon, Zsh, and the official Codex CLI with a ChatGPT login. You can keep using your existing Oh My Zsh configuration.
+**Requirements:** macOS 13 or later on Apple Silicon, Zsh, the official Codex CLI, and a ChatGPT account with Codex access. You can keep using your existing Oh My Zsh configuration.
 
 ### With Homebrew
 
@@ -46,10 +46,15 @@ If the official Codex CLI is not installed yet:
 
 ```sh
 brew install --cask codex
+```
+
+Then sign into Amber:
+
+```sh
 amber-shell login
 ```
 
-Amber reuses an existing Codex installation and login. Then open a **new terminal window** and press **Ctrl-X, then Ctrl-A**.
+Amber can reuse an existing Codex installation. Its login is separate from your personal Codex login, so sign into Amber once even if you already use Codex. Then open a **new terminal window** and press **Ctrl-X, then Ctrl-A**.
 
 Homebrew downloads the prebuilt ARM64 package and verifies its SHA256 checksum; installation does not require a Rust toolchain. Packages are distributed through the project's [Homebrew tap](https://github.com/marcdon2002/homebrew-tap). Homebrew packages for Intel Macs and Linux are not currently available.
 
@@ -75,7 +80,7 @@ cargo build --release --locked
 sh scripts/install.sh
 ```
 
-The source installer places the binary at `~/.local/bin/amber-shell` and the shell files under `~/.local/share/amber-shell/`. An early block in `.zshenv` starts output capture; `.zshrc` loads the ZLE widget after the prompt configuration. Personal Zsh startup files still load once; noninteractive shells and scripts run without the capture helper.
+The source installer places the binary at `~/.local/bin/amber-shell` and the shell files under `~/.local/share/amber-shell/`. Install the official Codex CLI if needed, then run `~/.local/bin/amber-shell login`. An early block in `.zshenv` starts output capture; `.zshrc` loads the ZLE widget after the prompt configuration. Personal Zsh startup files still load once; noninteractive shells and scripts run without the capture helper.
 
 <details>
 <summary>Symlinked shell files or a different Codex path</summary>
@@ -123,6 +128,27 @@ export AMBER_SHELL_SIMULATE=1
 Then use the normal hotkey. Simulation is marked **SIM** and uses separate local history. `unset AMBER_SHELL_SIMULATE` disables demo mode for subsequent launches.
 
 </details>
+
+## ChatGPT login
+
+Run `amber-shell login` to open the official **Log in with ChatGPT** flow in your browser. The official Codex CLI handles authentication and stores the result in Amber's own profile. Complete this login once after installation or after upgrading from a version that reused your personal Codex login.
+
+```sh
+amber-shell login                # Log into Amber in the browser
+amber-shell login status         # Show Amber's official login status
+amber-shell login --device-auth  # Use the official device-code flow
+```
+
+Amber runs the official CLI with a dedicated profile at `${XDG_CONFIG_HOME:-$HOME/.config}/amber-shell/codex/`. The profile directory is private (`0700`), and credential files are stored privately (`0600`) using the CLI's file credential store. Amber ignores an inherited `CODEX_HOME` and API key credentials from the environment. Your personal Codex profile, configuration, and login remain separate. There is no API key fallback.
+
+To switch the account used by Amber:
+
+```sh
+amber-shell logout
+amber-shell login
+```
+
+`amber-shell logout` removes only Amber's login. It keeps Amber's settings and response history, preserves your personal Codex login, and does not sign you out of the ChatGPT website. The browser may still remember the previous account; choose the account you want during the next login.
 
 ## Usage
 
@@ -186,22 +212,25 @@ Local Amber history holds at most **20 completed responses and 128 KiB** in tota
 - The inline area grows to at most 20 lines; in windows with at least 18 lines, it occupies no more than three quarters of the height.
 - Settings and history are stored under `${XDG_CONFIG_HOME:-$HOME/.config}/amber-shell/`. Amber's own files are private and saved atomically.
 - `settings.json` stores the model, Fast mode, and context choice; `history.json` stores completed Amber responses. Simulation data is kept separately.
+- `codex/` holds the separate official CLI profile used for Amber's ChatGPT login.
 
 </details>
 
 ## Model selection
 
-**GPT-6 Luna (`gpt-6-luna`) is the default.** Ctrl-O loads the model catalog for the existing Codex account. Use the arrow keys to select a model; Enter saves both the model and Fast mode, while Escape discards the change. Changes apply from the next question; model selection is disabled while an answer is being generated.
+**GPT-6 Luna (`gpt-6-luna`) is the default.** Ctrl-O loads the model catalog for the ChatGPT account signed into Amber. Use the arrow keys to select a model; Enter saves both the model and Fast mode, while Escape discards the change. Changes apply from the next question; model selection is disabled while an answer is being generated.
 
 Fast is an optional service mode available only for supported models. It may use more of your quota; the picker displays this notice. See the [official Codex documentation](https://learn.chatgpt.com/docs/agent-configuration/speed) for the current terms.
 
-Amber does not change the general Codex configuration or its authentication files. The official CLI handles login; there is no API key fallback or silent switch to another model.
+Amber keeps its official CLI profile separate from your personal Codex configuration and authentication files. The official CLI handles Amber's [ChatGPT login](#chatgpt-login). Amber does not silently switch to another model.
 
 ## Repository structure
 
 ```text
 src/
 ├── main.rs                 CLI and dialog startup
+├── cli_help.rs             English command help and examples
+├── auth.rs                 Separate ChatGPT browser login for Amber
 ├── model.rs                Input, conversation, and command selection
 ├── ui.rs                   Compact terminal display
 ├── terminal.rs             Events, resizing, and restoration
@@ -231,7 +260,7 @@ For a code change:
 cargo fmt --check
 cargo clippy --all-targets --locked -- -D warnings
 python3 tests/install_e2e.py
-cargo test --locked -- --test-threads=1
+XDG_CONFIG_HOME="$(mktemp -d)" cargo test --locked -- --test-threads=1
 ```
 
 Terminal checks use their own PTYs, synthetic input, and temporary profiles:
@@ -259,7 +288,7 @@ Intermediate files stay under `work/`; only the finished animation at `assets/am
 
 ### Maintaining Homebrew releases
 
-The [release workflow](./.github/workflows/release.yml) automatically tests and builds Amber on a standard ARM64 macOS runner when a version tag such as `v0.8.0` is pushed. The tag must match the version in `Cargo.toml`. The workflow uses only synthetic tests without model requests.
+The [release workflow](./.github/workflows/release.yml) automatically tests and builds Amber on a standard ARM64 macOS runner when a version tag such as `v0.8.1` is pushed. The tag must match the version in `Cargo.toml`. The workflow uses only synthetic tests without model requests.
 
 After updating the version in `Cargo.toml` and `Cargo.lock`, running local tests, and committing:
 
@@ -285,13 +314,26 @@ The archive contains only the binary, shell integration, installer, and MIT lice
 
 ## Help
 
-Check login status and the CLI version:
+Use the built-in help for commands and options:
 
 ```sh
+amber-shell --help
+amber-shell login --help
+amber-shell logout --help
+amber-shell doctor --help
+amber-shell ask --help
+amber-shell session --help
+```
+
+Check Amber's login status and the installed Codex version:
+
+```sh
+amber-shell login status
 amber-shell doctor
-amber-shell login
 # Source installation without a PATH entry: use ~/.local/bin/amber-shell.
 ```
+
+`doctor` reports the CLI version and Amber's official login status without sending a model request. If Amber needs a login, run `amber-shell login`; use `amber-shell login --device-auth` if you prefer the official device-code flow. To change accounts, run `amber-shell logout` followed by `amber-shell login`.
 
 After an update, open a new terminal window so the capture helper is updated too. Your shell input is preserved if there are network, account quota, or model permission problems. If output capture cannot be set up at startup, the normal shell still starts.
 

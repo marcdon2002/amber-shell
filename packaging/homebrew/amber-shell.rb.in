@@ -22,12 +22,17 @@ class AmberShell < Formula
     <<~EOS
       Enable the Zsh integration once (backs up your startup files):
         amber-shell-setup
-      Open a new terminal window, then press Ctrl-X followed by Ctrl-A.
 
-      Amber uses the official Codex CLI with your ChatGPT login:
+      Install the official Codex CLI if needed:
         brew install --cask codex
+
+      Sign into Amber with ChatGPT after setup:
         amber-shell login
-      Existing Codex installations and logins can be reused.
+      Amber can reuse an existing Codex installation. Its login is separate
+      from your personal Codex login; sign into Amber once even if Codex
+      is already signed in. amber-shell logout signs out only Amber.
+
+      Open a new terminal window, then press Ctrl-X followed by Ctrl-A.
     EOS
   end
 

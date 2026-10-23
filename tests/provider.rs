@@ -25,6 +25,9 @@ fn fake(mode: &str) -> (tempfile::TempDir, PathBuf) {
         r###"#!/usr/bin/env python3
 import sys,json,time,os,fcntl,termios,array
 mode={mode:?}
+assert os.environ['CODEX_HOME'].endswith(os.path.join('amber-shell','codex'))
+assert 'cli_auth_credentials_store="file"' in sys.argv
+assert not any(os.environ.get(k) for k in ['OPENAI_API_KEY','CODEX_API_KEY','CODEX_ACCESS_TOKEN','OPENAI_BASE_URL'])
 if 'mcp' in sys.argv:
  print(json.dumps([{{'name':'private-server','enabled':True}}])); sys.exit(0)
 args=' '.join(sys.argv)
@@ -49,7 +52,9 @@ for line in sys.stdin:
  if method=='config/read': result={{'config':{{'mcp_servers':{{'private-server':{{'enabled':mode=='unsafe-config'}}}}}}}}
  if method=='thread/start':
   assert 'simplest' in p['baseInstructions'] and 'ls' in p['baseInstructions']
-  assert 'Answer in English unless the user explicitly requests another language.' in p['developerInstructions']
+  assert "Write the explanation in the language of the user's current question" in p['developerInstructions']
+  assert 'unless the user explicitly requests a different response language' in p['developerInstructions']
+  assert 'not the English interface or supplied context' in p['developerInstructions']
   assert p['ephemeral'] is True and p['environments']==[] and p['model']=='gpt-6-luna'
   assert p['modelProvider']=='openai' and p['sandbox']=='read-only'
   assert p['serviceTier']==('priority' if mode in ['fast','wrong-tier'] else 'default')

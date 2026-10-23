@@ -54,6 +54,13 @@ pub fn load() -> Result<Settings, String> {
         std::env::var_os("HOME"),
     )?)
 }
+
+pub(crate) fn directory() -> Result<PathBuf, String> {
+    settings_directory(
+        std::env::var_os("XDG_CONFIG_HOME"),
+        std::env::var_os("HOME"),
+    )
+}
 pub fn save(settings: &Settings) -> Result<(), String> {
     save_settings_to(
         &settings_directory(
