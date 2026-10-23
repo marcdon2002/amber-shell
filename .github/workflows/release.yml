@@ -1,0 +1,66 @@
+name: Release
+
+on:
+  push:
+    tags: ["v[0-9]*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  macos-arm64:
+    runs-on: macos-15
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    env:
+      MACOSX_DEPLOYMENT_TARGET: "13.0"
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Validate release tag
+        env:
+          RELEASE_REF: ${{ github.ref }}
+        run: |
+          VERSION=$(sed -n 's/^version = "\([^"]*\)"/\1/p' Cargo.toml)
+          if [[ "$RELEASE_REF" == refs/tags/* ]]; then
+            test "$RELEASE_REF" = "refs/tags/v$VERSION"
+          fi
+          test "$(uname -m)" = arm64
+      - name: Install Rust
+        run: |
+          rustup toolchain install stable --profile minimal --component rustfmt,clippy
+          rustup default stable
+      - name: Check and build
+        run: |
+          cargo fmt --check
+          cargo test --locked
+          cargo clippy --all-targets --locked -- -D warnings
+          python3 tests/install_e2e.py
+          python3 tests/pty_e2e.py
+          python3 tests/session_bootstrap_e2e.py
+          cargo build --release --locked
+      - name: Package release
+        run: |
+          python3 scripts/package-release.py
+          cd work/release
+          shasum -a 256 -c SHA256SUMS
+          tar -xzf amber-shell-*-aarch64-apple-darwin.tar.gz
+          bin/amber-shell --version
+          bin/amber-shell --help
+      - name: Publish release
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            work/release/amber-shell-*-aarch64-apple-darwin.tar.gz \
+            work/release/SHA256SUMS work/release/amber-shell.rb \
+            --verify-tag --title "Amber Shell $GITHUB_REF_NAME" \
+            --notes 'macOS Apple Silicon release. Install with brew install marcdon2002/tap/amber-shell, then run amber-shell-setup. The tap formula must match the SHA256 in this release.'

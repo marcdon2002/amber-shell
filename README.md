@@ -257,7 +257,20 @@ Zwischendateien bleiben unter `work/`; nur die fertige Animation unter `assets/a
 
 ### Homebrew-Releases pflegen
 
-Der [Release-Packager](./scripts/package-release.py) erstellt auf einem ARM64-Mac ein Paket ausschließlich aus Binary, Shell-Integration, Installer und MIT-Lizenz. Er erzeugt außerdem `SHA256SUMS` und die passende `amber-shell.rb`. Die Binary muss zur Version in `Cargo.toml` passen.
+Der [Release-Workflow](./.github/workflows/release.yml) testet und baut Amber automatisch auf einem normalen ARM64-macOS-Runner, sobald ein Versions-Tag wie `v0.7.2` gepusht wird. Der Tag muss zur Version in `Cargo.toml` passen. Der Workflow verwendet ausschließlich synthetische Tests ohne Modellanfragen.
+
+Nach dem Aktualisieren der Version in `Cargo.toml` und `Cargo.lock`, den lokalen Tests und dem Commit:
+
+```sh
+git tag -a vX.Y.Z -m "Amber Shell X.Y.Z"
+git push origin main refs/tags/vX.Y.Z
+```
+
+Ein erfolgreicher Lauf veröffentlicht das Installationsarchiv, `SHA256SUMS` und die aus genau diesem Build erzeugte `amber-shell.rb` als GitHub-Release. Er benötigt nur den GitHub-Token des Amber-Repositories. Bestehende Release-Dateien werden nicht überschrieben. Ein manueller Start unter **Actions → Release → Run workflow** prüft und baut den gewählten Stand, ohne ein Release zu veröffentlichen.
+
+Anschließend **die aus diesem Release erzeugte** Formel als `Formula/amber-shell.rb` im [Homebrew-Tap](https://github.com/marcdon2002/homebrew-tap) aktualisieren. Dieser separate Schritt bleibt bewusst beim Maintainer; ein zusätzlicher Zugang zum Tap wird nicht im Amber-Repository hinterlegt. Der Tap prüft Änderungen automatisch mit einer echten Homebrew-Installation, `brew test` und `brew audit --strict`. Der Formulartest richtet die Shell nur in einem temporären Testordner ein.
+
+Für lokale Paketprüfungen bleibt der [Release-Packager](./scripts/package-release.py) verfügbar:
 
 ```sh
 MACOSX_DEPLOYMENT_TARGET=13.0 cargo build --release --locked
@@ -265,9 +278,7 @@ python3 scripts/package-release.py
 (cd work/release && shasum -a 256 -c SHA256SUMS)
 ```
 
-Nach den Tests den Stand committen und mit der passenden Version `vX.Y.Z` taggen. Das Archiv, `SHA256SUMS` und `amber-shell.rb` aus `work/release/` als Assets dieses GitHub-Releases veröffentlichen. Anschließend **die aus diesem Release erzeugte** Formel als `Formula/amber-shell.rb` im Tap aktualisieren. Dadurch stimmen Download und Prüfsumme überein; ein zusätzlicher Zugang zum Tap wird nicht im Amber-Repository hinterlegt.
-
-`brew audit --strict marcdon2002/tap/amber-shell` und `brew test marcdon2002/tap/amber-shell` prüfen das veröffentlichte Paket. Der Formulartest richtet die Shell nur in einem temporären Testordner ein.
+Das Archiv enthält ausschließlich Binary, Shell-Integration, Installer und MIT-Lizenz. Die Binary muss zur Version in `Cargo.toml` passen. Interne Unterlagen und Arbeitsdateien bleiben ausgeschlossen.
 
 ## Hilfe
 
