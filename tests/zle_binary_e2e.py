@@ -31,7 +31,7 @@ from wcwidth import wcwidth
 
 BINARY = ROOT / 'target/debug/amber-shell'
 PLUGIN = ROOT / 'shell/amber-shell.zsh'
-SIM_COMMAND = "printf '%s\\n' 'amber-shell bereit'"
+SIM_COMMAND = "printf '%s\\n' 'amber-shell ready'"
 MARKER = 'AMBER_ZLE_CONTEXT_7C42'
 USER_SHELL = False
 REAL = False
@@ -191,24 +191,24 @@ class ShellSession:
         rows=self.screen.display
         for y,row in enumerate(rows[:-1]):
             if 'amber' in row and 'Ctrl-O' in row:
-                match=re.search(r'(?:^|\s)(Antwort läuft|Modellwahl|Kontext|Verlauf|Wartet|Fertig|Fehler|Hinweis|Bereit|Stream)(?=\s|$)',rows[y+1])
+                match=re.search(r'(?:^|\s)(Streaming|Choose model|Context|History|Waiting|Done|Error|Notice|Ready|Stream)(?=\s|$)',rows[y+1])
                 return match.group(1) if match else ''
         return ''
 
     def open(self, context='a'):
         self.send(b'\x18\x01')
-        self.until(lambda: 'Was möchtest du tun?' in self.text(), label='direct question screen via default hotkey')
+        self.until(lambda: 'What would you like to do?' in self.text(), label='direct question screen via default hotkey')
         self.send(b'\x0b')
-        self.until(lambda: 'Kontext' in self.status_text(), label='context screen via default hotkey')
+        self.until(lambda: 'Context' in self.status_text(), label='context screen via default hotkey')
         self.send(context+'\r')
-        self.until(lambda: 'Was möchtest du tun?' in self.text(), label='chat input')
+        self.until(lambda: 'What would you like to do?' in self.text(), label='chat input')
 
     def question(self, text, timeout=8):
         # Bracketed paste is also the correct contract for multi-line/unicode text.
         self.send(b'\x1b[200~'+text.encode()+b'\x1b[201~\r')
-        self.until(lambda: ('> printf' in self.text() and 'Antwort läuft' not in self.text())
-                   or 'Fehler:' in self.text(), timeout, 'completed response')
-        if 'Fehler:' in self.text():
+        self.until(lambda: ('> printf' in self.text() and 'Streaming' not in self.text())
+                   or 'Error:' in self.text(), timeout, 'completed response')
+        if 'Error:' in self.text():
             # These rows only contain test content after startup/history isolation.
             raise AssertionError('Provider error: '+self.text())
         self.drain(.1)
@@ -281,7 +281,7 @@ for line in sys.stdin:
  if method=='turn/start':
   (root/'request.json').write_text(p['input'][0]['text'])
   emit({'id':i,'result':{'turn':{'id':'turn-test'}}})
-  answer=json.dumps({'explanation':'Listet den Inhalt auf.','command':'ls'})
+  answer=json.dumps({'explanation':'Lists the contents.','command':'ls'})
   emit({'method':'item/agentMessage/delta','params':{'threadId':'context-test','turnId':'turn-test','itemId':'answer','delta':answer}})
   emit({'method':'item/completed','params':{'threadId':'context-test','turnId':'turn-test','item':{'type':'agentMessage','id':'answer','text':answer,'phase':'final_answer'}}})
   emit({'method':'turn/completed','params':{'threadId':'context-test','turn':{'id':'turn-test','status':'completed','error':None}}})
@@ -295,10 +295,10 @@ for line in sys.stdin:
                 start=len(s.output);s.send(command+'\r')
                 s.until(lambda:b'EXECUTED_CONTEXT_81\r\n' in s.output[start:],label='actual shell command execution')
                 s.send(b'\x18\x01')
-                s.until(lambda:'Was möchtest du tun?' in s.text(),label='direct question with default context')
+                s.until(lambda:'What would you like to do?' in s.text(),label='direct question with default context')
                 s.send('Wie liste ich alle Ordner auf?\r')
                 s.until(lambda:capture.is_file(),label='captured actual provider request')
-                s.until(lambda:'Fertig' in s.status_text(),label='complete fake provider response')
+                s.until(lambda:'Done' in s.status_text(),label='complete fake provider response')
                 request=json.loads(capture.read_text())
                 self.assertIn(command,request['context'])
                 self.assertNotIn(MARKER,request['context'],'ordinary shell questions must not scan project files')
@@ -313,15 +313,15 @@ for line in sys.stdin:
                 (web/'package.json').write_text('{"name":"web","scripts":{"dev":"vite --host"},"description":"OMIT_UNUSED_DESCRIPTION"}')
                 capture.unlink()
                 s.send(b'\x15\x18\x01')
-                s.until(lambda:'Was möchtest du tun?' in s.text(),label='reopened question')
+                s.until(lambda:'What would you like to do?' in s.text(),label='reopened question')
                 s.send('Wie starte ich das npm Web Projekt?\r')
                 s.until(lambda:capture.is_file(),label='project provider request')
-                s.until(lambda:'Fertig' in s.status_text(),label='project response')
+                s.until(lambda:'Done' in s.status_text(),label='project response')
                 project=json.loads(capture.read_text())['context']
                 self.assertIn('apps/web/package.json',project)
                 self.assertIn('vite --host',project)
                 self.assertIn('pnpm@10.0.0',project)
-                self.assertIn('Terminalausschnitt',project)
+                self.assertIn('Terminal excerpt',project)
                 self.assertNotIn('OMIT_UNUSED_DESCRIPTION',project)
                 self.assertLess(len(project.encode()),8192)
                 self.assertEqual(s.take(),(b'ls',2))
@@ -337,8 +337,8 @@ for line in sys.stdin:
             s.open()
             self.assertNotIn(question,s.text())
             s.send(b'\t')
-            s.until(lambda:'Verlauf' in s.status_text(),label='reopened history focus')
-            s.until(lambda:'amber-shell bereit' in s.text(),label='saved Amber command')
+            s.until(lambda:'History' in s.status_text(),label='reopened history focus')
+            s.until(lambda:'amber-shell ready' in s.text(),label='saved Amber command')
             s.send(b'\x1b[A'*20)
             s.until(lambda:question in s.text(),label='saved Amber question')
             s.send(b'\x1b[D')
@@ -347,7 +347,7 @@ for line in sys.stdin:
             s.until(lambda:'> '+SIM_COMMAND in s.text(),label='Amber source selected')
             self.assertEqual(s.take(),(SIM_COMMAND.encode(),len(SIM_COMMAND)))
             s.open();s.send(b'\t')
-            s.until(lambda:'Verlauf' in s.status_text(),label='second reopened history')
+            s.until(lambda:'History' in s.status_text(),label='second reopened history')
             s.send(b'\x1b[D')
             s.until(lambda:'> '+shell_command in s.text(),label='shell source selected again')
             s.send(b'\r')
@@ -362,15 +362,15 @@ for line in sys.stdin:
         try:
             s.open()
             for number in range(3):
-                s.send(f'Verlauf-Frage-{number}\r')
-                s.until(lambda:'Antwort läuft' in s.text(),label='streaming start')
-                s.until(lambda:'Fertig' in s.text() and '> printf' in s.text(),label='complete response')
+                s.send(f'History-question-{number}\r')
+                s.until(lambda:'Streaming' in s.text(),label='streaming start')
+                s.until(lambda:'Done' in s.text() and '> printf' in s.text(),label='complete response')
             s.send(b'\t')
-            s.until(lambda:'Verlauf' in s.status_text(),label='history focus')
+            s.until(lambda:'History' in s.status_text(),label='history focus')
             s.send(b'\x1b[A'*20)
-            s.until(lambda:'Du:    Verlauf-Frage-0' in s.text(),label='earlier history with arrows')
+            s.until(lambda:'You:   History-question-0' in s.text(),label='earlier history with arrows')
             s.send(b'\x1b[B'*20)
-            s.until(lambda:'Du:    Verlauf-Frage-2' in s.text(),label='latest history with arrows')
+            s.until(lambda:'You:   History-question-2' in s.text(),label='latest history with arrows')
             s.send(b'\x1b[D\r')
             s.until(lambda:'Ctrl-O' not in s.text(),label='history Enter returns to ZLE')
             self.assertEqual(s.capture(),(SIM_COMMAND.encode(),len(SIM_COMMAND)))
@@ -384,10 +384,10 @@ for line in sys.stdin:
             s.seed(original,7)
             s.open()
             s.send(b'\x0f')
-            s.until(lambda:'Modellwahl' in s.text(),label='model picker')
+            s.until(lambda:'Choose model' in s.text(),label='model picker')
             s.send(b'\x1b')
-            s.until(lambda:'Was möchtest du tun?' in s.text(),label='escape returns from picker to chat')
-            self.assertNotIn('Modellwahl',s.text())
+            s.until(lambda:'What would you like to do?' in s.text(),label='escape returns from picker to chat')
+            self.assertNotIn('Choose model',s.text())
             s.cancel()
             self.assertEqual(s.capture(),(original.encode(),7))
             s.assert_modes()
@@ -405,7 +405,7 @@ for line in sys.stdin:
             s.send(b'\r')
             # OMZ emits an OSC title immediately before command stdout, so the
             # output line need not be preceded by a raw CRLF byte sequence.
-            s.until(lambda: b'amber-shell bereit\r\n' in s.output[start:], label='normal Enter printf execution')
+            s.until(lambda: b'amber-shell ready\r\n' in s.output[start:], label='normal Enter printf execution')
             self.assertNotIn(b'\x1b[?1049h',s.output)
             self.assertNotIn(b'\x1b[2J',s.output)
             self.assertNotIn(b'\x1b[3J',s.output)
@@ -418,7 +418,7 @@ for line in sys.stdin:
             for key in (b'\x1b',b'\x03'):
                 s.seed(original,7)
                 s.send(b'\x18\x01')
-                s.until(lambda:'Was möchtest du tun?' in s.text(),label='direct question')
+                s.until(lambda:'What would you like to do?' in s.text(),label='direct question')
                 s.cancel(key)
                 self.assertEqual(s.capture(),(original.encode(),7))
                 s.assert_modes()
@@ -444,13 +444,13 @@ for line in sys.stdin:
             s.drain(.1)
             s.resize(40,12);s.drain(.15)
             s.resize(10,3)
-            s.until(lambda:'Fenster' in s.text(),label='minimal layout')
+            s.until(lambda:'Enlarge' in s.text(),label='minimal layout')
             s.resize(100,30)
             s.until(lambda:'> printf' in s.text(),label='complete after resize')
             s.send(b'\t')
-            s.until(lambda:'Befehl wählen' in s.text(),label='command focus')
+            s.until(lambda:'←→ command' in s.text(),label='command focus')
             s.resize(10,3);s.drain(.1);s.resize(100,30)
-            s.until(lambda:'Befehl wählen' in s.text(),label='command focus after resize')
+            s.until(lambda:'←→ command' in s.text(),label='command focus after resize')
             command,cursor=s.take()
             self.assertEqual(command,SIM_COMMAND.encode())
             self.assertEqual(cursor,len(SIM_COMMAND))
@@ -466,14 +466,14 @@ for line in sys.stdin:
             s.open(context='a')
             self.assertIn('GPT-6 Luna',s.text())
             s.send(b'\x0f')
-            s.until(lambda:'Modellwahl' in s.text() and '(aktiv)' in s.text(),
+            s.until(lambda:'Choose model' in s.text() and '(active)' in s.text(),
                     timeout=90,label='official model catalog with active selection')
             selected=[line.strip() for line in s.screen.display if line.strip().startswith('> ')]
             self.assertEqual(len(selected),1)
             self.assertIn('luna',selected[0].lower())
-            self.assertIn('(aktiv)',selected[0])
+            self.assertIn('(active)',selected[0])
             s.send(b'\r')
-            s.until(lambda:'Modellwahl' not in s.text(),label='save actual catalog selection')
+            s.until(lambda:'Choose model' not in s.text(),label='save actual catalog selection')
             settings=json.loads((s.config_directory/'amber-shell/settings.json').read_text())
             self.assertEqual(settings['model'],'gpt-6-luna')
             s.question('Welcher verification marker steht in der mitgegebenen README? Gib genau einen printf-Befehl, der ausschließlich diesen Marker mit abschließendem Zeilenumbruch ausgibt. Verwende printf mit %s\\n als Format.',timeout=180)
@@ -482,8 +482,8 @@ for line in sys.stdin:
             # confused with the already visible first suggestion.
             s.send(b'\x1b[200~'+('Rückfrage: Verwende den Marker aus deiner vorherigen Antwort und hänge _FOLLOWUP an. Gib ausschließlich einen printf-Befehl mit Format %s\\n, der diesen erweiterten Marker ausgibt.').encode()+b'\x1b[201~\r')
             s.until(lambda:MARKER+'_FOLLOWUP' in s.text() and '> printf' in s.text()
-                    and 'Antwort läuft' not in s.text(),timeout=180,label='real follow-up completion')
-            self.assertNotIn('Fehler:',s.text())
+                    and 'Streaming' not in s.text(),timeout=180,label='real follow-up completion')
+            self.assertNotIn('Error:',s.text())
             command,cursor=s.take()
             text=command.decode()
             self.assertEqual(cursor,len(text))

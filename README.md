@@ -1,6 +1,8 @@
 # amber-shell
 
-Ein kompakter Terminalassistent für **macOS, Apple Terminal und Zsh**: Frage stellen, Erklärung lesen und den passenden Befehl in die editierbare Shell-Zeile übernehmen. Die offizielle Codex CLI nutzt dafür die vorhandene ChatGPT-Anmeldung.
+A compact terminal assistant for **macOS, Apple Terminal, and Zsh**: ask a question, read the explanation, and insert the suggested command into your editable shell prompt. Amber uses the official Codex CLI and your existing ChatGPT login.
+
+Amber's interface and default responses are in English. You can explicitly request a response in another language.
 
 [![Rust](https://img.shields.io/badge/Rust-000000?style=for-the-badge&logo=rust&logoColor=white)](https://www.rust-lang.org/)
 [![Ratatui](https://img.shields.io/badge/Ratatui-F8C76D?style=for-the-badge&logoColor=171717)](https://ratatui.rs/)
@@ -8,231 +10,231 @@ Ein kompakter Terminalassistent für **macOS, Apple Terminal und Zsh**: Frage st
 [![Homebrew](https://img.shields.io/badge/Homebrew-FBB040?style=for-the-badge&logo=homebrew&logoColor=171717)](https://github.com/marcdon2002/homebrew-tap)
 [![Zsh](https://img.shields.io/badge/Zsh-F15A24?style=for-the-badge&logo=zsh&logoColor=white)](https://www.zsh.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-F8C76D?style=for-the-badge)](./LICENSE)
-[![Codex](https://img.shields.io/badge/Codex-ChatGPT_Anmeldung-10A37F?style=for-the-badge)](#modellwahl)
+[![Codex](https://img.shields.io/badge/Codex-ChatGPT_Login-10A37F?style=for-the-badge)](#model-selection)
 
-[Installation](#installation) · [Bedienung](#bedienung) · [Modellwahl](#modellwahl) · [Projektstruktur](#projektstruktur) · [Entwicklung](#entwicklung) · [Hilfe](#hilfe)
+[Installation](#installation) · [Usage](#usage) · [Model selection](#model-selection) · [Repository structure](#repository-structure) · [Development](#development) · [Help](#help)
 
 > [!TIP]
-> **Ctrl-X, danach Ctrl-A** öffnet Amber direkt am Prompt. **Ctrl-Y** übernimmt den ausgewählten Befehl. Ausgeführt wird er erst durch ein separates normales **Enter in der Shell**. Escape oder Ctrl-C erhalten die vorherige Eingabe samt Cursor.
+> **Ctrl-X, then Ctrl-A** opens Amber directly at the prompt. **Ctrl-Y** inserts the selected command. It only runs when you separately press **Enter in the shell**. Escape or Ctrl-C preserves your previous input and cursor position.
 
-![Amber öffnen, eine Frage stellen, nachfragen und den Befehl editierbar in die Shell übernehmen](./assets/amber-demo.gif)
+![Open Amber, ask a question, follow up, and insert an editable command into the shell](./assets/amber-demo.gif)
 
-*Produktablauf aus der echten Ratatui-Oberfläche mit simulierten Antworten und beispielhaften Wartezeiten. Ctrl-Y übernimmt den Befehl als editierbaren Text; ausgeführt wird er erst mit Enter in der Shell.*
+*Product flow from the actual Ratatui interface, with simulated responses and illustrative wait times. Ctrl-Y inserts the command as editable text; it only runs when you press Enter in the shell.*
 
-## Überblick
+## Overview
 
-Amber bleibt als kleine Inline-Fläche im Terminal. Jeder Austausch bildet einen zusammengehörigen Block mit einer kurzen senkrechten Linie. „Du“ und „Amber“ kennzeichnen die Rollen; Fragen und Antworten beginnen an derselben Textkante, Befehle stehen leicht eingerückt darunter. Das kompakte Amber-Logo hebt sich mit einer eigenen Wortmarke und einem unabhängig animierten Statuszeichen ab. Die Eingabe behält ihren abgerundeten Rahmen. Die Höhe passt sich an den Inhalt an; längere Antworten und Befehle lassen sich mit den Pfeiltasten lesen. Modell und Fast-Modus bleiben rechts sichtbar.
+Amber stays in a small inline area in the terminal. Each exchange forms a single block marked by a short vertical line. “You” and “Amber” identify the roles; questions and answers share the same text alignment, with commands slightly indented below. The compact Amber logo has its own wordmark and an independently animated status symbol. The input keeps its rounded border. The area adapts to the content height; use the arrow keys to read longer answers and commands. The model and Fast mode remain visible on the right.
 
-Der Tab-Verlauf vereint frühere Amber-Fragen mit ihren Befehlsvorschlägen im gleichen Ordner und die letzten gefilterten Shell-Befehle. Rückfragen bleiben im laufenden Gespräch möglich. Ein neu geöffneter Dialog beginnt ein frisches Modellgespräch. Letzte Befehle und begrenzte Terminalausgaben stehen dabei als Kontext bereit, damit Amber auch Fehler direkt einordnen kann.
+The Tab history combines previous Amber questions and their suggested commands from the same directory with recent filtered shell commands. You can ask follow-up questions in the current conversation. Opening a new dialog starts a fresh model conversation. Recent commands and limited terminal output are available as context so Amber can help explain errors.
 
-Amber schlägt zuerst den einfachsten passenden Standardbefehl vor: Auf „Wie liste ich alle Ordner auf?“ folgt `ls`. Zusätzliche Optionen und komplexere Varianten gibt es auf gezielte Nachfrage.
+Amber suggests the simplest suitable standard command first: “How do I list all directories?” returns `ls`. Ask specifically for additional options or more complex alternatives.
 
-Für die Ausgabeerfassung läuft pro Terminal ein kleiner Rust-Helfer, der im Leerlauf auf Ereignisse wartet. Er hält die Ausschnitte ausschließlich im Speicher; pro Befehl startet kein zusätzlicher Erfassungsprozess. Codex startet für eine Anfrage und wird danach beendet.
+A small Rust helper runs for each terminal to capture output, waiting for events while idle. It keeps snippets entirely in memory; no additional capture process starts for each command. Codex starts for a request and exits afterward.
 
 ## Installation
 
-**Voraussetzungen:** macOS 13 oder neuer auf Apple Silicon, Zsh und die offizielle Codex CLI mit ChatGPT-Anmeldung. Die vorhandene Oh-My-Zsh-Konfiguration kann weiterverwendet werden.
+**Requirements:** macOS 13 or later on Apple Silicon, Zsh, and the official Codex CLI with a ChatGPT login. You can keep using your existing Oh My Zsh configuration.
 
-### Mit Homebrew
+### With Homebrew
 
 ```sh
 brew install marcdon2002/tap/amber-shell
 amber-shell-setup
 ```
 
-Falls die offizielle Codex CLI noch fehlt:
+If the official Codex CLI is not installed yet:
 
 ```sh
 brew install --cask codex
 amber-shell login
 ```
 
-Eine bestehende Codex-Installation samt Anmeldung wird weiterverwendet. Danach ein **neues Terminalfenster** öffnen und **Ctrl-X, danach Ctrl-A** drücken.
+Amber reuses an existing Codex installation and login. Then open a **new terminal window** and press **Ctrl-X, then Ctrl-A**.
 
-Homebrew lädt das fertige ARM64-Paket mit SHA256-Prüfung; eine Rust-Toolchain ist für die Installation nicht nötig. Die Distribution erfolgt über den eigenen [Homebrew-Tap](https://github.com/marcdon2002/homebrew-tap). Intel-Macs und Linux werden derzeit nicht als Homebrew-Paket angeboten.
+Homebrew downloads the prebuilt ARM64 package and verifies its SHA256 checksum; installation does not require a Rust toolchain. Packages are distributed through the project's [Homebrew tap](https://github.com/marcdon2002/homebrew-tap). Homebrew packages for Intel Macs and Linux are not currently available.
 
-`amber-shell-setup` sichert vorhandene `.zshenv` und `.zshrc`, ergänzt die markierten Amber-Blöcke und kann die bisherige Installation unter `~/.local` übernehmen. Es ersetzt ausschließlich unveränderte, vom Installer erzeugte Blöcke; eigene Anpassungen und Symlinks benötigen eine bewusste Zuordnung. Die Einbindung verweist auf Homebrews stabilen `opt`-Pfad, damit Updates keine erneute Einrichtung brauchen. Das Setup startet keine Modellanfrage.
+`amber-shell-setup` backs up existing `.zshenv` and `.zshrc` files, adds the marked Amber blocks, and can migrate a previous installation under `~/.local`. It only replaces unchanged blocks created by the installer; custom changes and symlinks require you to specify the appropriate target. The integration uses Homebrew's stable `opt` path, so updates do not require setup again. Setup does not send a model request.
 
-Bei einer früheren Quellcode-Installation kann `~/.local/bin/amber-shell` im `PATH` vor Homebrew stehen. Der eingerichtete Hotkey verwendet ausdrücklich die Homebrew-Binary. Für direkte CLI-Aufrufe die alte Datei nach erfolgreicher Migration aus dem `PATH` nehmen oder `"$(brew --prefix amber-shell)/bin/amber-shell"` aufrufen.
+With a previous source installation, `~/.local/bin/amber-shell` may appear before Homebrew in your `PATH`. The configured hotkey explicitly uses the Homebrew binary. For direct CLI calls, remove the old file from your `PATH` after a successful migration, or run `"$(brew --prefix amber-shell)/bin/amber-shell"`.
 
-Aktualisieren:
+To update:
 
 ```sh
 brew update
 brew upgrade marcdon2002/tap/amber-shell
 ```
 
-Danach ein neues Terminalfenster öffnen. Zum Deinstallieren zuerst die beiden markierten Amber-Blöcke aus `.zshenv` und `.zshrc` entfernen, dann `brew uninstall amber-shell` ausführen. Lokale Einstellungen und Verlauf bleiben erhalten.
+Then open a new terminal window. To uninstall, first remove the two marked Amber blocks from `.zshenv` and `.zshrc`, then run `brew uninstall amber-shell`. Local settings and history are retained.
 
-### Aus dem Quellcode
+### From source
 
-Mit einer Rust-Toolchain gemäß [Cargo.toml](./Cargo.toml) im Repository-Ordner:
+With a Rust toolchain that meets the requirements in [Cargo.toml](./Cargo.toml), run these commands in the repository directory:
 
 ```sh
 cargo build --release --locked
 sh scripts/install.sh
 ```
 
-Der Quellcode-Installer legt die Binary unter `~/.local/bin/amber-shell` und die Shell-Dateien unter `~/.local/share/amber-shell/` ab. Ein früher Block in `.zshenv` startet die Ausgabeerfassung; `.zshrc` lädt das ZLE-Widget nach der Prompt-Konfiguration. Persönliche Zsh-Startdateien werden weiterhin einmal geladen; nichtinteraktive Shells und Skripte bleiben ohne Erfassungshelfer.
+The source installer places the binary at `~/.local/bin/amber-shell` and the shell files under `~/.local/share/amber-shell/`. An early block in `.zshenv` starts output capture; `.zshrc` loads the ZLE widget after the prompt configuration. Personal Zsh startup files still load once; noninteractive shells and scripts run without the capture helper.
 
 <details>
-<summary>Verlinkte Shell-Dateien oder abweichender Codex-Pfad</summary>
+<summary>Symlinked shell files or a different Codex path</summary>
 
-Bei einer verlinkten `.zshrc` oder `.zshenv` das jeweilige aufgelöste Ziel angeben; der Symlink bleibt erhalten:
-
-```sh
-amber-shell-setup --zshrc /absoluter/pfad/zur/zshrc
-# Falls auch .zshenv verlinkt ist: zusätzlich --zshenv /absoluter/pfad/zur/zshenv
-# Quellcode-Installation: dieselben Optionen an sh scripts/install.sh übergeben.
-```
-
-Standardmäßig liegt Codex unter `/opt/homebrew/bin/codex`. Für eine andere offizielle Installation vor dem Öffnen von Amber setzen:
+For a symlinked `.zshrc` or `.zshenv`, specify its resolved target; the symlink is preserved:
 
 ```sh
-export AMBER_CODEX_BIN="/absoluter/pfad/zu/codex"
+amber-shell-setup --zshrc /absolute/path/to/zshrc
+# If .zshenv is also symlinked, add --zshenv /absolute/path/to/zshenv.
+# Source installation: pass the same options to sh scripts/install.sh.
 ```
 
-Der Hotkey lässt sich über `AMBER_SHELL_KEY` vor dem Laden des Plugins anpassen. Vorhandene Tastenzuweisungen werden nicht überschrieben.
+The default Codex path is `/opt/homebrew/bin/codex`. For another official installation, set this before opening Amber:
+
+```sh
+export AMBER_CODEX_BIN="/absolute/path/to/codex"
+```
+
+Set `AMBER_SHELL_KEY` before loading the plugin to customize the hotkey. Existing key bindings are not overwritten.
 
 </details>
 
 <details>
-<summary>Ohne dauerhafte Shell-Einbindung ausprobieren</summary>
+<summary>Try Amber without a permanent shell integration</summary>
 
 ```sh
 export AMBER_SHELL_BIN="$PWD/target/release/amber-shell"
 source shell/amber-shell.zsh
 ```
 
-Diese Einbindung gilt nur in der aktuellen Shell und erfasst keine bereits vergangenen Ausgaben. Um auch den Erfassungshelfer ohne Installation auszuprobieren, eine eigene Shell starten und dort das Plugin laden:
+This integration only applies to the current shell and cannot capture earlier output. To try the capture helper without installing it, start a separate shell and load the plugin there:
 
 ```sh
 "$AMBER_SHELL_BIN" session -- /bin/zsh -i
-# In dieser Shell, weiterhin im Repository-Ordner:
+# In this shell, still in the repository directory:
 source shell/amber-shell.zsh
 ```
 
-Für eine netzwerkfreie Demo:
+For an offline demo:
 
 ```sh
 export AMBER_SHELL_SIMULATE=1
 ```
 
-Danach den normalen Hotkey verwenden. Die Simulation ist als **SIM** gekennzeichnet und verwendet einen eigenen lokalen Verlauf. `unset AMBER_SHELL_SIMULATE` beendet den Demomodus für spätere Aufrufe.
+Then use the normal hotkey. Simulation is marked **SIM** and uses separate local history. `unset AMBER_SHELL_SIMULATE` disables demo mode for subsequent launches.
 
 </details>
 
-## Bedienung
+## Usage
 
-| Taste | Aktion |
+| Key | Action |
 | --- | --- |
-| Ctrl-X, danach Ctrl-A | Amber am Shell-Prompt öffnen |
-| Enter | Frage oder Rückfrage senden |
-| Ctrl-Y | Ausgewählten vollständigen Befehl in die Shell übernehmen |
-| Tab | Zwischen Frage und Verlauf wechseln |
-| ↑ / ↓ im Verlauf | Lesen und scrollen |
-| ← / → im Verlauf | Amber-Vorschlag oder Shell-Befehl auswählen |
-| Enter im Verlauf | Gewählten Befehl in die Shell übernehmen |
-| Ctrl-O | Modellwahl öffnen |
-| Ctrl-F im Modellpicker | Fast-Modus umschalten, sofern unterstützt |
-| Ctrl-K | Freiwilligen Zusatzkontext einstellen |
-| Ctrl-E | Wieder der neuesten Ausgabe folgen |
-| Escape / Ctrl-C | Abbrechen; ursprüngliche Shell-Eingabe erhalten |
+| Ctrl-X, then Ctrl-A | Open Amber at the shell prompt |
+| Enter | Send a question or follow-up |
+| Ctrl-Y | Insert the selected complete command into the shell |
+| Tab | Switch between the question and history |
+| ↑ / ↓ in history | Read and scroll |
+| ← / → in history | Select an Amber suggestion or shell command |
+| Enter in history | Insert the selected command into the shell |
+| Ctrl-O | Open model selection |
+| Ctrl-F in the model picker | Toggle Fast mode when supported |
+| Ctrl-K | Configure optional additional context |
+| Ctrl-E | Resume following the latest output |
+| Escape / Ctrl-C | Cancel and preserve the original shell input |
 
-**Übernahme und Ausführung bleiben getrennt.** Auch mehrzeilige Befehle werden als editierbarer Text übernommen. Die sichtbare Markierung gehört nicht zum Befehl. Während einer Antwort kann bereits eine Rückfrage vorbereitet werden.
+**Inserting and running a command are separate actions.** Multiline commands are also inserted as editable text. The visible marker is not part of the command. You can prepare a follow-up while an answer is being generated.
 
-### Kontext und Verlauf
+### Context and history
 
-**Automatisch** ist die Voreinstellung: Amber erhält den aktuellen Ordner, letzte geeignete Shell-Befehle und erfasste Ausgaben mit Exit-Status. Die feste Grenze von drei Ausgaben entfällt. Stattdessen entscheidet ein Größenbudget, wie viele Schritte erhalten bleiben; lange Ausgaben werden auf ihren letzten Teil gekürzt und markiert. Bereits bei einer Ausgabe aufgeführte Befehle werden nicht nochmals als Shell-History angehängt.
+**Automatic** is the default: Amber receives the current directory, recent eligible shell commands, and captured output with exit status. There is no fixed limit of three outputs. Instead, a size budget determines how many steps are retained; long outputs are trimmed to their final section and marked. Commands already included with an output are not appended again as shell history.
 
-Bei einer Projektfrage ergänzt Amber passende Informationen aus dem aktuellen Ordner, seinen Unterordnern und übergeordneten Manifesten innerhalb des Git-Projekts. Bei „Wie starte ich das npm Webprojekt?“ kann das etwa `apps/web/package.json` mit den tatsächlichen Skripten und dem Paketmanager aus dem Workspace sein. `package.json` wird auf relevante Felder verdichtet; Quellcode, Lockfile-Inhalte und vollständige Abhängigkeitsbäume werden nicht gelesen. Bei einer einfachen Frage wie „Wie liste ich Ordner auf?“ entfällt die Projektsuche.
+For project questions, Amber adds relevant information from the current directory, its subdirectories, and parent manifests within the Git project. For “How do I start the npm web project?”, this might include `apps/web/package.json` with the actual scripts and the workspace's package manager. `package.json` is condensed to relevant fields; source code, lockfile contents, and complete dependency trees are not read. Simple questions such as “How do I list directories?” do not trigger a project search.
 
-**Ctrl-K** bietet eine einzige, lokal gespeicherte Wahl:
+**Ctrl-K** provides one locally saved choice:
 
-| Taste | Modus | Wirkung |
+| Key | Mode | Effect |
 | --- | --- | --- |
-| A | Automatisch | Terminalkontext und bei Projektfragen passende Projektinfos |
-| T | Nur Terminal | Ordner, Befehle und erfasste Ausgaben; keine Projektdateien |
-| X | Aus | Keinen neuen Zusatzkontext mitsenden |
+| A | Automatic | Terminal context and relevant project information for project questions |
+| T | Terminal only | Directory, commands, and captured output; no project files |
+| X | Off | Send no new additional context |
 
-**Tab** zeigt den tatsächlichen Anhang zur aktuellen Eingabe; Enter oder Escape kehrt zur Frage zurück. Die Auswahl gilt ab der nächsten Frage und bleibt beim erneuten Öffnen erhalten. Bereits versendete Informationen bleiben im laufenden Gespräch; zum Neustart Amber schließen und erneut öffnen.
+**Tab** shows the actual attachment for the current input; Enter or Escape returns to the question. Your choice applies from the next question and persists when you reopen Amber. Information already sent remains in the current conversation; close and reopen Amber to start over.
 
-Die Suche startet erst bei einer Projektfrage und wird im Dialog wiederverwendet. Es gibt keinen permanenten Dateiindex, Hintergrundscanner oder zusätzlichen Modellaufruf. Ignorierte Verzeichnisse, `node_modules`, Buildordner und Symlinks werden übersprungen. Git-Ignore-Regeln gelten auch in Ordnern ohne Repository. Bei einer begrenzten Suche weist Amber darauf hin; ein Wechsel in den konkreten Unterordner grenzt große Projekte weiter ein.
+Search starts only for a project question, and its results are reused within the dialog. There is no persistent file index, background scanner, or additional model call. Ignored directories, `node_modules`, build directories, and symlinks are skipped. Git ignore rules also apply in directories without a repository. Amber indicates when a search reaches its limits; changing to the relevant subdirectory narrows the search in large projects.
 
 <details>
-<summary>Such- und Größenlimits</summary>
+<summary>Search and size limits</summary>
 
-- Terminalring: höchstens **24 KiB serialisiert**, ohne feste Anzahl; je Befehl bis **4 KiB Ausgabetail**. Der Modellanhang erhält davon bis **12 KiB**, bei Bedarf mit weiter gekürzten Ausgaben.
-- Shell-History: letzte bis zu **20 geeignete Befehle**, höchstens **8 KiB**.
-- Projektsuche: bis **4 Unterordnerebenen**, **96 Verzeichnisse**, **1.024 Einträge**, **24 kleine Manifest-/Dokumentationsdateien** und ein Zeitbudget von **150 ms** zwischen Dateioperationen.
-- Pro Frage: höchstens **4 Projektdateiauszüge** mit insgesamt **8 KiB** einschließlich JSON-Escaping und Dateimarkierungen. Der ganze neue Kontextanhang bleibt auf **48 KiB** begrenzt.
-- Erlaubte Dateien: `package.json`, `Cargo.toml`, `pyproject.toml`, `go.mod`, `Makefile`, `justfile`, `README.md` und `README`. README-Auszüge werden nur bei entsprechenden Fragen ergänzt. Die Suche ist keine vollständige Quellcodeanalyse.
+- Terminal ring buffer: up to **24 KiB serialized**, with no fixed entry count; up to **4 KiB of output tail** per command. The model attachment receives up to **12 KiB** of this, with further output trimming if needed.
+- Shell history: up to the last **20 eligible commands**, with an **8 KiB** limit.
+- Project search: up to **4 subdirectory levels**, **96 directories**, **1,024 entries**, **24 small manifest or documentation files**, and a **150 ms** time budget checked between file operations.
+- Per question: up to **4 project file excerpts** totaling **8 KiB**, including JSON escaping and file markers. The entire new context attachment is limited to **48 KiB**.
+- Allowed files: `package.json`, `Cargo.toml`, `pyproject.toml`, `go.mod`, `Makefile`, `justfile`, `README.md`, and `README`. README excerpts are only added for relevant questions. The search is not a complete source code analysis.
 
 </details>
 
-Die Ausgabeerfassung beginnt mit einer neuen Terminal-Sitzung. Sie hält die Ausschnitte ausschließlich im Arbeitsspeicher und schreibt kein Ausgabelog. Beim Öffnen von Amber wird ein Schnappschuss abgefragt; beim Schließen der Shell verschwinden die Ausschnitte. Interaktive Eingaben, erkannte Vollbildansichten, Geheimnisse und sensible Pfade werden ausgelassen; die Filter sind heuristisch. Der gemeinsame Terminalstrom enthält Standard- und Fehlerausgabe, möglicherweise mit Hintergrundausgaben. In Dateien umgeleitete Ausgaben fehlen.
+Output capture starts with a new terminal session. It keeps snippets entirely in memory and does not write an output log. Opening Amber requests a snapshot; closing the shell discards the snippets. Interactive input, detected full-screen views, secrets, and sensitive paths are omitted; these filters are heuristic. The combined terminal stream includes standard output and standard error, potentially including background output. Output redirected to files is not captured.
 
-Der lokale Amber-Verlauf hält insgesamt höchstens **20 abgeschlossene Antworten und 128 KiB**. Er wird nach dem aktuellen Ordner gefiltert. Das reine Lesen alter Einträge hängt sie nicht automatisch an eine neue Modellanfrage an. Die Shell-History liefert Befehle; Ausgabeausschnitte stammen ausschließlich aus der laufenden Erfassungssitzung und werden nicht im Antwortverlauf gespeichert.
+Local Amber history holds at most **20 completed responses and 128 KiB** in total. It is filtered by the current directory. Reading old entries does not automatically attach them to a new model request. Shell history supplies commands; output snippets come exclusively from the current capture session and are not saved in the response history.
 
 <details>
-<summary>Darstellung und lokale Dateien</summary>
+<summary>Display and local files</summary>
 
-- `NO_COLOR=1` deaktiviert Farben.
-- Die Standardansicht verwendet kurze senkrechte Linien und den abgerundeten Eingaberahmen. `AMBER_SHELL_ASCII=1` aktiviert einfache ASCII-Zeichen für Rahmen und Markierungen; `AMBER_SHELL_ASCII=0` verwendet die Standardansicht.
-- `AMBER_SHELL_REDUCED_MOTION=1` deaktiviert die Aktivitätsanimation.
-- `AMBER_SHELL_CAPTURE=0 /bin/zsh -il` startet eine neue Shell ohne Ausgabeerfassung. Mit Ctrl-K und X lässt sich neuer Zusatzkontext vollständig ausschalten.
-- Die Inline-Fläche wächst auf höchstens 20 Zeilen; ab 18 Fensterzeilen belegt sie maximal drei Viertel der Höhe.
-- Einstellungen und Verlauf liegen unter `${XDG_CONFIG_HOME:-$HOME/.config}/amber-shell/`. Eigene Dateien sind privat und werden atomar gespeichert.
-- `settings.json` speichert Modell, Fast-Modus und Kontextwahl; `history.json` die abgeschlossenen Amber-Antworten. Simulationsdaten liegen getrennt.
+- `NO_COLOR=1` disables colors.
+- The default view uses short vertical lines and a rounded input border. `AMBER_SHELL_ASCII=1` enables plain ASCII characters for borders and markers; `AMBER_SHELL_ASCII=0` uses the default view.
+- `AMBER_SHELL_REDUCED_MOTION=1` disables the activity animation.
+- `AMBER_SHELL_CAPTURE=0 /bin/zsh -il` starts a new shell without output capture. Use Ctrl-K and X to disable all new additional context.
+- The inline area grows to at most 20 lines; in windows with at least 18 lines, it occupies no more than three quarters of the height.
+- Settings and history are stored under `${XDG_CONFIG_HOME:-$HOME/.config}/amber-shell/`. Amber's own files are private and saved atomically.
+- `settings.json` stores the model, Fast mode, and context choice; `history.json` stores completed Amber responses. Simulation data is kept separately.
 
 </details>
 
-## Modellwahl
+## Model selection
 
-**GPT-6 Luna (`gpt-6-luna`) ist der Standard.** Ctrl-O lädt den Modellkatalog des vorhandenen Codex-Kontos. Pfeiltasten wählen, Enter speichert Modell und Fast-Modus gemeinsam; Escape verwirft die Änderung. Ein Wechsel gilt ab der nächsten Frage und ist während einer laufenden Antwort gesperrt.
+**GPT-6 Luna (`gpt-6-luna`) is the default.** Ctrl-O loads the model catalog for the existing Codex account. Use the arrow keys to select a model; Enter saves both the model and Fast mode, while Escape discards the change. Changes apply from the next question; model selection is disabled while an answer is being generated.
 
-Fast ist ein optionaler Dienstmodus und wird nur für unterstützte Modelle angeboten. Er kann mehr Kontingent verbrauchen; der Picker zeigt den Hinweis an. Die aktuellen Bedingungen stehen in der [offiziellen Codex-Dokumentation](https://learn.chatgpt.com/docs/agent-configuration/speed).
+Fast is an optional service mode available only for supported models. It may use more of your quota; the picker displays this notice. See the [official Codex documentation](https://learn.chatgpt.com/docs/agent-configuration/speed) for the current terms.
 
-Amber verändert weder die allgemeine Codex-Konfiguration noch dessen Auth-Dateien. Die Anmeldung bleibt bei der offiziellen CLI; es gibt keinen API-Key-Fallback oder stillen Wechsel auf ein anderes Modell.
+Amber does not change the general Codex configuration or its authentication files. The official CLI handles login; there is no API key fallback or silent switch to another model.
 
-## Projektstruktur
+## Repository structure
 
 ```text
 src/
-├── main.rs                 CLI und Start des Dialogs
-├── model.rs                Eingabe, Gespräch und Befehlsauswahl
-├── ui.rs                   Kompakte Terminaldarstellung
-├── terminal.rs             Ereignisse, Resize und Wiederherstellung
-├── provider.rs             Offizieller Codex-App-Server
-├── context.rs              Begrenzter, einsehbarer Zusatzkontext
-├── projects.rs             Gezielte Suche und kompakte Projektinfos
-├── capture.rs              Gefilterter Ausgabering im Speicher
-├── session.rs              Ereignisgesteuerte PTY-Erfassung
-├── history.rs              Privater lokaler Antwortverlauf
-└── settings.rs             Modell-, Fast- und Kontext-Einstellungen
-shell/amber-shell.zsh       ZLE-Widget und sichere Befehlsübernahme
-shell/amber-session.zsh     Früher Start der Ausgabeerfassung
-scripts/                   Installation und Demo-Erzeugung
-examples/render_frames.rs  Reproduzierbare Renderer-Frames
-tests/                     Rust-, Terminal- und ZLE-Prüfungen
-assets/amber-demo.gif       Eingebettete Terminalanimation
-LICENSE                     MIT-Lizenz
+├── main.rs                 CLI and dialog startup
+├── model.rs                Input, conversation, and command selection
+├── ui.rs                   Compact terminal display
+├── terminal.rs             Events, resizing, and restoration
+├── provider.rs             Official Codex app server
+├── context.rs              Limited, inspectable additional context
+├── projects.rs             Targeted search and compact project information
+├── capture.rs              Filtered output ring buffer in memory
+├── session.rs              Event-driven PTY capture
+├── history.rs              Private local response history
+└── settings.rs             Model, Fast mode, and context settings
+shell/amber-shell.zsh       ZLE widget and safe command insertion
+shell/amber-session.zsh     Early startup of output capture
+scripts/                   Installation and demo generation
+examples/render_frames.rs  Reproducible renderer frames
+tests/                     Rust, terminal, and ZLE checks
+assets/amber-demo.gif       Embedded terminal animation
+LICENSE                    MIT license
 ```
 
-Quellcode, Tests, Lockdatei, README und Demo-Animation bilden den veröffentlichten Stand. Interne Dokumente und Prüfberichte unter `docs/`, Arbeitsdateien, Build-Ausgaben, lokale History und Zugangsdaten bleiben über [`.gitignore`](./.gitignore) ausgeschlossen.
+The published repository includes source code, tests, the lockfile, README, and demo animation. Internal documents and verification reports under `docs/`, working files, build output, local history, and credentials remain excluded through [`.gitignore`](./.gitignore).
 
-## Entwicklung
+## Development
 
-Für eine Codeänderung:
+For a code change:
 
 ```sh
 cargo fmt --check
 cargo clippy --all-targets --locked -- -D warnings
 python3 tests/install_e2e.py
-cargo test --locked
+cargo test --locked -- --test-threads=1
 ```
 
-Die Terminalprüfungen verwenden eigene PTYs, synthetische Eingaben und temporäre Profile:
+Terminal checks use their own PTYs, synthetic input, and temporary profiles:
 
 ```sh
 python3 -m pip install --target work/testdeps -r tests/requirements.txt
@@ -244,33 +246,34 @@ python3 tests/session_e2e.py
 python3 tests/session_bootstrap_e2e.py
 ```
 
-Tests mit echten Modellanfragen sind ausdrücklich opt-in. Im normalen Testlauf werden sie ausgelassen.
+Tests that send real model requests are explicitly opt-in. They are skipped in normal test runs.
 
-Die README-Animation enthält ausschließlich Demo-Daten aus dem tatsächlichen Ratatui-Renderer:
+The README animation contains only demo data from the actual Ratatui renderer:
 
 ```sh
 TERM=xterm-256color cargo run --locked --example render_demo -- work/product-demo/timeline.json
 python3 scripts/render-demo.py --input work/product-demo/timeline.json
 ```
 
-Zwischendateien bleiben unter `work/`; nur die fertige Animation unter `assets/amber-demo.gif` wird versioniert.
+Intermediate files stay under `work/`; only the finished animation at `assets/amber-demo.gif` is versioned.
 
-### Homebrew-Releases pflegen
+### Maintaining Homebrew releases
 
-Der [Release-Workflow](./.github/workflows/release.yml) testet und baut Amber automatisch auf einem normalen ARM64-macOS-Runner, sobald ein Versions-Tag wie `v0.7.3` gepusht wird. Der Tag muss zur Version in `Cargo.toml` passen. Der Workflow verwendet ausschließlich synthetische Tests ohne Modellanfragen.
+The [release workflow](./.github/workflows/release.yml) automatically tests and builds Amber on a standard ARM64 macOS runner when a version tag such as `v0.8.0` is pushed. The tag must match the version in `Cargo.toml`. The workflow uses only synthetic tests without model requests.
 
-Nach dem Aktualisieren der Version in `Cargo.toml` und `Cargo.lock`, den lokalen Tests und dem Commit:
+After updating the version in `Cargo.toml` and `Cargo.lock`, running local tests, and committing:
 
 ```sh
 git tag -a vX.Y.Z -m "Amber Shell X.Y.Z"
-git push origin main refs/tags/vX.Y.Z
+git push origin main
+git push origin refs/tags/vX.Y.Z
 ```
 
-Ein erfolgreicher Lauf veröffentlicht das Installationsarchiv, `SHA256SUMS` und die aus genau diesem Build erzeugte `amber-shell.rb` als GitHub-Release. Er benötigt nur den GitHub-Token des Amber-Repositories. Bestehende Release-Dateien werden nicht überschrieben. Ein manueller Start unter **Actions → Release → Run workflow** prüft und baut den gewählten Stand, ohne ein Release zu veröffentlichen.
+A successful run publishes the installation archive, `SHA256SUMS`, and the `amber-shell.rb` generated from that exact build as a GitHub release. It only needs the Amber repository's GitHub token. Existing release files are not overwritten. A manual run under **Actions → Release → Run workflow** checks and builds the selected revision without publishing a release.
 
-Anschließend **die aus diesem Release erzeugte** Formel als `Formula/amber-shell.rb` im [Homebrew-Tap](https://github.com/marcdon2002/homebrew-tap) aktualisieren. Dieser separate Schritt bleibt bewusst beim Maintainer; ein zusätzlicher Zugang zum Tap wird nicht im Amber-Repository hinterlegt. Der Tap prüft Änderungen automatisch mit einer echten Homebrew-Installation, `brew test` und `brew audit --strict`. Der Formulartest richtet die Shell nur in einem temporären Testordner ein.
+Then update `Formula/amber-shell.rb` in the [Homebrew tap](https://github.com/marcdon2002/homebrew-tap) with **the formula generated by this release**. This separate step is deliberately left to the maintainer; no additional tap credentials are stored in the Amber repository. The tap automatically checks changes with a real Homebrew installation, `brew test`, and `brew audit --strict`. The formula test sets up the shell only in a temporary test directory.
 
-Für lokale Paketprüfungen bleibt der [Release-Packager](./scripts/package-release.py) verfügbar:
+The [release packager](./scripts/package-release.py) remains available for local package checks:
 
 ```sh
 MACOSX_DEPLOYMENT_TARGET=13.0 cargo build --release --locked
@@ -278,22 +281,22 @@ python3 scripts/package-release.py
 (cd work/release && shasum -a 256 -c SHA256SUMS)
 ```
 
-Das Archiv enthält ausschließlich Binary, Shell-Integration, Installer und MIT-Lizenz. Die Binary muss zur Version in `Cargo.toml` passen. Interne Unterlagen und Arbeitsdateien bleiben ausgeschlossen.
+The archive contains only the binary, shell integration, installer, and MIT license. The binary must match the version in `Cargo.toml`. Internal documents and working files remain excluded.
 
-## Hilfe
+## Help
 
-Loginstatus und CLI-Version prüfen:
+Check login status and the CLI version:
 
 ```sh
 amber-shell doctor
 amber-shell login
-# Quellcode-Installation ohne PATH-Eintrag: ~/.local/bin/amber-shell verwenden.
+# Source installation without a PATH entry: use ~/.local/bin/amber-shell.
 ```
 
-Nach einem Update ein neues Terminalfenster öffnen, damit auch der Erfassungshelfer aktualisiert wird. Bei Problemen mit Netzwerk, Kontolimit oder Modellberechtigung bleibt die Shell-Eingabe erhalten. Kann die Ausgabeerfassung beim Start nicht eingerichtet werden, startet die normale Shell weiter.
+After an update, open a new terminal window so the capture helper is updated too. Your shell input is preserved if there are network, account quota, or model permission problems. If output capture cannot be set up at startup, the normal shell still starts.
 
-Fehler und Vorschläge können im [Issue-Tracker](https://github.com/marcdon2002/amber-shell/issues) festgehalten werden.
+Report bugs and suggestions in the [issue tracker](https://github.com/marcdon2002/amber-shell/issues).
 
-## Lizenz
+## License
 
-Amber Shell steht unter der [MIT-Lizenz](./LICENSE).
+Amber Shell is available under the [MIT license](./LICENSE).

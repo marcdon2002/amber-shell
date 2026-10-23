@@ -1,15 +1,15 @@
-# Lokale Arbeitsunterlagen und exportierte Kopien
+# Local working documents and exported copies
 /work/
 /outputs/
 /docs/
 .DS_Store
 
-# Rust-Builds und Python-Testcache
+# Rust builds and Python test cache
 /target/
 __pycache__/
 *.pyc
 
-# Zugangsdaten und private Laufzeitdaten niemals versionieren
+# Never version credentials or private runtime data
 .env
 .env.*
 *.pem
@@ -20,7 +20,7 @@ __pycache__/
 /history/
 /transcripts/
 
-# Lokale Agentenregeln und Laufzeit-Einstellungen
+# Local agent rules and runtime settings
 /AGENTS.md
 /DESIGN.md
 /design-qa.md

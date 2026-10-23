@@ -61,6 +61,8 @@ pub fn relevant(question: &str) -> bool {
         "make",
         "just ",
         "readme",
+        "documentation",
+        "docs",
         "dokumentation",
         "script",
         "skript",
@@ -227,7 +229,7 @@ impl ProjectIndex {
                 content
             } else {
                 format!(
-                    "Dateiauszug (max. 2048 Zeichen):\n{}",
+                    "File excerpt (up to 2048 characters):\n{}",
                     raw.chars().take(2048).collect::<String>()
                 )
             };
@@ -271,7 +273,9 @@ impl ProjectIndex {
                 w.trim_matches(|c: char| c == '?' || c == ',' || c == '.'),
                 "readme" | "readme.md" | "readme.txt"
             ) || w.ends_with("/readme.md")
-        }) || q.contains("dokumentation");
+        }) || ["documentation", "docs", "dokumentation"]
+            .iter()
+            .any(|word| q.contains(word));
         let words: Vec<_> = q
             .split(|c: char| !c.is_alphanumeric() && c != '-' && c != '_')
             .filter(|w| w.len() >= 3)
@@ -353,7 +357,7 @@ impl ProjectIndex {
 
 fn encoded_size(file: &ContextFile) -> usize {
     serde_json::to_string(&format!(
-        "\n--- {} ---\n{}\n--- Dateiende ---\n",
+        "\n--- {} ---\n{}\n--- End of file ---\n",
         file.path, file.content
     ))
     .map_or(ATTACH_BYTES + 1, |s| s.len())
@@ -396,7 +400,7 @@ fn compact_package(path: &Path, raw: &str) -> Option<String> {
     if content.len() > 4096 {
         return None;
     }
-    Some(format!("Manifest-Auszug (Schlüssel gekürzt): {content}"))
+    Some(format!("Manifest excerpt (selected keys): {content}"))
 }
 
 /// Batch Git's complete ignore rules, including tracked files and global excludes.

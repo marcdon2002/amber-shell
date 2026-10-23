@@ -63,7 +63,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 cwd: "/demo/amber-project".into(),
                 files: vec![amber_shell::context::ContextFile {
                     path: "apps/web/package.json".into(),
-                    content: "Manifest-Auszug: {\"scripts\":{\"dev\":\"vite\"}}".into(),
+                    content: "Manifest excerpt: {\"scripts\":{\"dev\":\"vite\"}}".into(),
                 }],
                 history: vec!["cargo test".into()],
                 omitted: 0,
@@ -113,41 +113,45 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 || state.starts_with("stream")
                 || ["final", "final-wrapped", "error", "ascii-final", "no-color"].contains(&state)
             {
-                app.editor.insert("Wie prüfe ich dieses Projekt?");
+                app.editor.insert("How do I check this project?");
                 app.begin()?;
                 if !state.starts_with("waiting") && state != "error" {
-                    app.delta("{\"explanation\":\"Führe die Tests des Rust-Projekts aus. Damit prüfst du die bestehenden Funktionen.")?;
+                    app.delta("{\"explanation\":\"Run the Rust project's tests to check the existing features.")?;
                 }
                 if ["final", "final-wrapped", "ascii-final", "no-color"].contains(&state) {
                     let command = if state == "final-wrapped" {
-                        "printf '%s\\n' 'Ein langer kontrollierter Beispieltext zeigt den Zeilenumbruch dieses Befehls auch bei einem Terminal mit einhundert Spalten.'\nprintf '%s\\n' 'Eine zweite Befehlszeile bleibt ebenfalls vollständig hervorgehoben.'"
+                        "printf '%s\\n' 'This long controlled example shows how a command wraps even in a terminal with one hundred columns.'\nprintf '%s\\n' 'A second command line also remains fully highlighted.'"
                     } else {
                         "cargo test"
                     };
-                    app.complete(Reply { explanation: "Führe die Tests des Rust-Projekts aus. Damit prüfst du die bestehenden Funktionen.".into(), command: command.into() })?;
+                    app.complete(Reply {
+                        explanation: "Run the Rust project's tests to check the existing features."
+                            .into(),
+                        command: command.into(),
+                    })?;
                 }
                 if state == "error" {
-                    app.fail("Verbindung unterbrochen. Bitte erneut versuchen.".into());
+                    app.fail("Connection lost. Please try again.".into());
                 }
             }
             if state == "markdown" {
-                app.editor.insert("Wie zeige ich die Namen im Ordner?");
+                app.editor.insert("How do I list names in this folder?");
                 app.begin()?;
                 app.complete(Reply {
-                    explanation: "Mit `ls` werden **Dateien und Ordner** aufgelistet.".into(),
+                    explanation: "Use `ls` to list **files and folders**.".into(),
                     command: "ls".into(),
                 })?;
             }
             if state == "design-selected" {
                 for (question, explanation, command) in [
                     (
-                        "Wie liste ich Dateien und Ordner auf?",
-                        "Mit ls siehst du die Einträge im aktuellen Ordner.",
+                        "How do I list files and folders?",
+                        "ls lists the entries in the current folder.",
                         "ls",
                     ),
                     (
-                        "Auch die versteckten?",
-                        "Mit -a werden auch versteckte Einträge angezeigt.",
+                        "And hidden ones?",
+                        "Use -a to include hidden entries.",
                         "ls -a",
                     ),
                 ] {
@@ -160,26 +164,25 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
             }
             if state == "followup" {
-                app.editor.insert("Wie prüfe ich dieses Projekt?");
+                app.editor.insert("How do I check this project?");
                 app.begin()?;
                 app.complete(Reply {
-                    explanation: "Starte zunächst die vorhandenen Tests.".into(),
+                    explanation: "Start with the existing tests.".into(),
                     command: "cargo test".into(),
                 })?;
-                app.editor
-                    .insert("Wie zeige ich dabei auch die Testausgaben?");
+                app.editor.insert("How do I show the test output too?");
                 app.begin()?;
-                app.delta("{\"explanation\":\"Du kannst die Ausgabe der Tests mit einer zusätzlichen Option einblenden.")?;
+                app.delta("{\"explanation\":\"Add an option to show the test output.")?;
             }
             if state == "long-answer" {
                 app.editor
-                    .insert("Wie prüfe ich das Projekt und zeige die Testausgaben?");
+                    .insert("How do I check the project and show the test output?");
                 app.begin()?;
                 app.complete(Reply {
-                    explanation: "Prüfe zuerst das Projekt mit den vorhandenen Tests.
-Die zweite Zeile prüft anschließend die Formatierung.
-Du kannst beide Befehle vor der Ausführung bearbeiten.
-Die Testausgaben bleiben im normalen Terminal sichtbar."
+                    explanation: "Check the project with its existing tests first.
+The second line then checks formatting.
+You can edit both commands before running them.
+Test output stays visible in the normal terminal."
                         .into(),
                     command: "cargo test -- --nocapture\ncargo fmt --check".into(),
                 })?;
@@ -187,11 +190,11 @@ Die Testausgaben bleiben im normalen Terminal sichtbar."
             if state == "history" {
                 app.shell_commands = vec!["git status --short".into(), "cargo test".into()];
                 app.past_turns = vec![Turn {
-                    question: "Wie zeige ich offene Ports?".into(),
+                    question: "How do I show open ports?".into(),
                     stream: String::new(),
                     error: None,
                     reply: Some(Reply {
-                        explanation: "Zeigt offene TCP-Ports ohne DNS-Auflösung.".into(),
+                        explanation: "Lists open TCP ports without DNS resolution.".into(),
                         command: "lsof -nP -iTCP -sTCP:LISTEN".into(),
                     }),
                 }];
@@ -207,7 +210,7 @@ Die Testausgaben bleiben im normalen Terminal sichtbar."
             let mut terminal = Terminal::new(backend)?;
             terminal.draw(|f| ui::render(f, &mut app))?;
             let cells: Vec<_> = terminal.backend().buffer().content.iter().map(|cell| json!({"symbol":cell.symbol(),"fg":format!("{:?}",cell.fg),"bg":format!("{:?}",cell.bg),"modifier":format!("{:?}",cell.modifier)})).collect();
-            let frame = json!({"label":"Terminal-Test-Render","width":width,"height":height,"state":state,"cells":cells});
+            let frame = json!({"label":"Terminal test render","width":width,"height":height,"state":state,"cells":cells});
             std::fs::write(
                 format!("{directory}/{state}-{width}x{height}.json"),
                 serde_json::to_vec_pretty(&frame)?,

@@ -91,10 +91,10 @@ class Session:
         # preservation checks can still assert the sentinel's exact position.
         if seeded:self.stream.feed(b'\x1b[6;1HX\x1b[7;1H')
         self.output = b''
-        self.wait_screen('Frag nach einem Befehl.')
+        self.wait_screen('Ask for a command.')
         if review:
             self.send(b'\x0b')
-            self.wait_status('Kontext')
+            self.wait_status('Context')
     def resize(self,w,h):
         self.screen.resize(h,w)
         fcntl.ioctl(self.master, termios.TIOCSWINSZ, struct.pack('HHHH',h,w,0,0))
@@ -117,7 +117,7 @@ class Session:
         rows=self.screen.display
         for y,row in enumerate(rows[:-1]):
             if 'amber' in row and 'Ctrl-O' in row:
-                match=re.search(r'(?:^|\s)(Antwort läuft|Modellwahl|Kontext|Verlauf|Wartet|Fertig|Fehler|Hinweis|Bereit|Stream)(?=\s|$)',rows[y+1])
+                match=re.search(r'(?:^|\s)(Streaming|Choose model|Context|History|Waiting|Done|Error|Notice|Ready|Stream)(?=\s|$)',rows[y+1])
                 return match.group(1) if match else ''
         return ''
     def wait_status(self,needle,timeout=8):
@@ -152,21 +152,21 @@ class Session:
 class TerminalTests(unittest.TestCase):
     def test_leaving_history_never_transfers_a_hidden_old_selection(self):
         old_command="printf '%s\\n' 'OLD_SHELL_SELECTION'"
-        expected=b"printf '%s\\n' 'amber-shell bereit'\0"
+        expected=b"printf '%s\\n' 'amber-shell ready'\0"
         for departure in ('tab','typing','paste'):
             with self.subTest(departure=departure):
                 s=Session(review=False,shell_history=[old_command])
                 try:
-                    s.send(b'\t');s.wait_status('Verlauf')
+                    s.send(b'\t');s.wait_status('History')
                     s.wait_screen('> '+old_command)
                     if departure=='tab':
-                        s.send(b'\t');s.wait_screen('Frag nach einem Befehl.')
+                        s.send(b'\t');s.wait_screen('Ask for a command.')
                         s.send('Neue Frage nach Tab\r')
                     elif departure=='typing':
                         s.send('Neue Frage nach Tippen\r')
                     else:
                         s.send(b'\x1b[200~Neue Frage nach Paste\x1b[201~\r')
-                    s.wait_status('Fertig')
+                    s.wait_status('Done')
                     self.assertNotIn(old_command,s.text())
                     s.send(b'\x19');s.wait()
                     self.assertEqual(s.result.read_bytes(),expected)
@@ -178,27 +178,27 @@ class TerminalTests(unittest.TestCase):
             config=Path(shared)/'config'
             shell_command="printf '%s\\n' 'SHELL_RECALL_42' > shell-executed"
             question='AMBER_RECALL_42'
-            command=b"printf '%s\\n' 'amber-shell bereit'\0"
+            command=b"printf '%s\\n' 'amber-shell ready'\0"
             first=Session(review=False,cwd=project,config_directory=config,shell_history=[shell_command])
             try:
-                first.send(question+'\r');first.wait_status('Fertig')
+                first.send(question+'\r');first.wait_status('Done')
                 first.send(b'\x1b');first.wait()
                 self.assertFalse(first.result.exists())
             finally:first.close()
             recalled=Session(review=False,cwd=project,config_directory=config,shell_history=[shell_command])
             try:
                 self.assertNotIn(question,recalled.text())
-                recalled.send(b'\t');recalled.wait_status('Verlauf')
-                recalled.wait_screen('amber-shell bereit')
+                recalled.send(b'\t');recalled.wait_status('History')
+                recalled.wait_screen('amber-shell ready')
                 recalled.send(b'\x1b[A'*20);recalled.wait_screen(question)
                 recalled.send(b'\x1b[D');recalled.wait_screen('> '+shell_command)
-                recalled.send(b'\x1b[C');recalled.wait_screen("> printf '%s\\n' 'amber-shell bereit'")
+                recalled.send(b'\x1b[C');recalled.wait_screen("> printf '%s\\n' 'amber-shell ready'")
                 recalled.send(b'\x19');recalled.wait()
                 self.assertEqual(recalled.result.read_bytes(),command)
             finally:recalled.close()
             shell=Session(review=False,cwd=project,config_directory=config,shell_history=[shell_command])
             try:
-                shell.send(b'\t');shell.wait_status('Verlauf')
+                shell.send(b'\t');shell.wait_status('History')
                 shell.send(b'\x1b[D');shell.wait_screen('> '+shell_command)
                 shell.send(b'\r');shell.wait()
                 self.assertEqual(shell.result.read_bytes(),shell_command.encode()+b'\0')
@@ -221,22 +221,22 @@ class TerminalTests(unittest.TestCase):
             initial=occupied_height()
             for number in range(3):
                 s.send(f'Adaptive Inhaltsfrage {number}\r')
-                s.wait_status('Antwort läuft');s.wait_status('Fertig')
+                s.wait_status('Streaming');s.wait_status('Done')
                 self.assert_compact(s)
             self.assertGreater(occupied_height(),initial)
             self.assertGreater(occupied_height(),14,'long dialog must use the newly available body space')
             s.resize(80,24);s.read(.3)
             self.assert_compact(s)
             s.send(b'\x19');s.wait()
-            self.assertEqual(s.result.read_bytes(),b"printf '%s\\n' 'amber-shell bereit'\0")
+            self.assertEqual(s.result.read_bytes(),b"printf '%s\\n' 'amber-shell ready'\0")
         finally:s.close()
 
     def test_launch_starts_at_question_and_context_is_optional(self):
         s=Session(review=False)
         try:
-            self.assertNotIn('Kontext',s.status_text())
-            s.send(b'\x0b');s.wait_status('Kontext')
-            s.send(b'\x1b');s.wait_screen('Frag nach einem Befehl.')
+            self.assertNotIn('Context',s.status_text())
+            s.send(b'\x0b');s.wait_status('Context')
+            s.send(b'\x1b');s.wait_screen('Ask for a command.')
             self.assertIsNone(s.proc.poll())
             s.send(b'\x1b');s.wait()
             self.assertEqual(s.proc.returncode,2)
@@ -245,9 +245,9 @@ class TerminalTests(unittest.TestCase):
     def test_width_reflow_redraw_clears_only_owned_rows_and_restores_shell(self):
         s=Session(seeded=True)
         try:
-            s.wait_status('Kontext');s.resize(80,40);s.read(.2)
-            s.send(b'a\r');s.wait_screen('Frag nach einem Befehl.')
-            s.send('Prüfe die vorhandenen Dateien im Projekt\r');s.wait_screen('Fertig')
+            s.wait_status('Context');s.resize(80,40);s.read(.2)
+            s.send(b'a\r');s.wait_screen('Ask for a command.')
+            s.send('Prüfe die vorhandenen Dateien im Projekt\r');s.wait_screen('Done')
             self.assertEqual(s.screen.display[5][0],'X')
             s.reflow_resize(40,40);s.read(.4)
             text=s.text()
@@ -266,12 +266,12 @@ class TerminalTests(unittest.TestCase):
                 try:
                     s.resize(80,50);s.read(.1)
                     if streaming:
-                        s.send('Prüfe Resize während der Antwort\r');s.wait_screen('Antwort läuft')
+                        s.send('Prüfe Resize während der Antwort\r');s.wait_screen('Streaming')
                     for width,height in [(40,40),(60,36),(80,50)]:
                         s.reflow_resize(width,height);s.read(.18)
                         self.assertEqual(sum('amber' in row and 'Ctrl-O' in row for row in s.screen.display),1)
                         self.assertIn('X',[row.strip() for row in s.screen.display])
-                    if streaming:s.wait_screen('Fertig')
+                    if streaming:s.wait_screen('Done')
                     s.send(b'\x1b');s.wait();s.read(.1)
                     self.assertEqual([row.strip() for row in s.screen.display if row.strip()],['X'])
                     self.assertNotIn(b'\x1b[2J',s.output)
@@ -283,21 +283,21 @@ class TerminalTests(unittest.TestCase):
             s=Session(config_directory=config,review=False)
             settings=Path(config)/'amber-shell/settings.json'
             try:
-                s.send(b'\x0f');s.wait_screen('Fast aus')
-                s.send(b'\x06');s.wait_screen('Fast an')
-                s.send(b'\x1b');s.wait_screen('Frag nach einem Befehl.')
+                s.send(b'\x0f');s.wait_screen('Fast off')
+                s.send(b'\x06');s.wait_screen('Fast on')
+                s.send(b'\x1b');s.wait_screen('Ask for a command.')
                 self.assertFalse(settings.exists(),'Escape must discard the draft')
-                s.send(b'\x0f');s.wait_screen('Fast aus')
-                s.send(b'\x06\r');s.wait_screen('Modell gespeichert')
+                s.send(b'\x0f');s.wait_screen('Fast off')
+                s.send(b'\x06\r');s.wait_screen('Model saved')
                 self.assertEqual(json.loads(settings.read_text()),{'model':'gpt-6-luna','fast':True,'context':'automatic'})
                 s.send(b'\x1b');s.wait()
             finally:s.close()
             reopened=Session(config_directory=config,review=False)
             try:
                 self.assertIn('Fast',reopened.text())
-                reopened.send(b'\x0f');reopened.wait_screen('Fast an')
-                reopened.send(b'\x1b[B');reopened.wait_screen('Fast für dieses Modell nicht verfügbar')
-                reopened.send(b'\r');reopened.wait_screen('Fast nicht verfügbar')
+                reopened.send(b'\x0f');reopened.wait_screen('Fast on')
+                reopened.send(b'\x1b[B');reopened.wait_screen('Fast unavailable for this model')
+                reopened.send(b'\r');reopened.wait_screen('Fast unavailable')
                 self.assertEqual(json.loads(settings.read_text()),{'model':'gpt-6-sol','fast':False,'context':'automatic'})
                 reopened.send(b'\x1b');reopened.wait()
             finally:reopened.close()
@@ -309,19 +309,19 @@ class TerminalTests(unittest.TestCase):
             config=Path(directory,'config')
             s=Session(cwd=directory,config_directory=config,shell_history=["printf 'COMMAND_CONTEXT_DEFAULT'"],review=False)
             try:
-                s.send('npm web dev?');s.send(b'\x0b');s.wait_screen('A  Automatisch')
+                s.send('npm web dev?');s.send(b'\x0b');s.wait_screen('A  Automatic')
                 s.send(b'\t');s.send(b'\x1b[B'*8);s.wait_screen('vite')
                 s.send(b't');s.send(b'\x1b[B'*4);s.wait_screen('COMMAND_CONTEXT_DEFAULT')
                 self.assertNotIn('vite',s.text())
-                s.send(b'x');s.wait_screen('Kein neuer Zusatzkontext')
+                s.send(b'x');s.wait_screen('No new context')
                 s.send(b'\t');s.send(b'\r');s.wait_screen('npm web dev?')
                 self.assertEqual(json.loads((config/'amber-shell/settings.json').read_text())['context'],'off')
                 s.send(b'\x1b');s.wait()
             finally:s.close()
             reopened=Session(cwd=directory,config_directory=config)
             try:
-                reopened.wait_screen('Kein neuer Zusatzkontext')
-                reopened.send(b'a');reopened.wait_screen('A  Automatisch')
+                reopened.wait_screen('No new context')
+                reopened.send(b'a');reopened.wait_screen('A  Automatic')
                 reopened.send(b'\r\x1b');reopened.wait()
                 self.assertEqual(json.loads((config/'amber-shell/settings.json').read_text())['context'],'automatic')
             finally:reopened.close()
@@ -332,20 +332,20 @@ class TerminalTests(unittest.TestCase):
             directory=s.config_directory/'amber-shell'
             directory.mkdir(exist_ok=True)
             (directory/'settings.json').write_text('broken')
-            s.send(b'x');s.wait_screen('Einstellung nicht gespeichert')
-            self.assertIn('A  Automatisch',s.text())
-            self.assertNotIn('Kein neuer Zusatzkontext',s.text())
+            s.send(b'x');s.wait_screen('Setting not saved')
+            self.assertIn('A  Automatic',s.text())
+            self.assertNotIn('No new context',s.text())
             s.send(b'\r\x1b');s.wait()
         finally:s.close()
 
     def test_idle_sends_no_redraw_bytes(self):
         s=Session()
         try:
-            s.wait_status('Kontext');s.read(.1)
+            s.wait_status('Context');s.read(.1)
             before=len(s.output)
             s.read(.8)
             self.assertEqual(len(s.output),before,'idle context must not redraw')
-            s.send(b'a\r');s.wait_screen('Frag nach einem Befehl.');s.read(.1)
+            s.send(b'a\r');s.wait_screen('Ask for a command.');s.read(.1)
             before=len(s.output)
             s.read(.8)
             self.assertEqual(len(s.output),before,'idle input must not animate')
@@ -354,11 +354,11 @@ class TerminalTests(unittest.TestCase):
     def test_active_logo_animates_then_stays_finished_without_redraw(self):
         s=Session()
         try:
-            s.wait_status('Kontext');s.send(b'a\r');s.wait_screen('Frag nach einem Befehl.')
-            s.send('Prüfe den aktiven Status\r');s.wait_screen('Antwort läuft')
+            s.wait_status('Context');s.send(b'a\r');s.wait_screen('Ask for a command.')
+            s.send('Prüfe den aktiven Status\r');s.wait_screen('Streaming')
             headers=set()
             deadline=time.monotonic()+8
-            while time.monotonic()<deadline and 'Fertig' not in s.text():
+            while time.monotonic()<deadline and 'Done' not in s.text():
                 for y,row in enumerate(s.screen.display):
                     if 'amber' in row and 'Ctrl-O' in row:
                         logo_end=row.index('amber')
@@ -370,7 +370,7 @@ class TerminalTests(unittest.TestCase):
                                           for cell in [s.screen.buffer[logo_y][x]]))
                 s.read(.03)
             self.assertGreaterEqual(len(headers),2,'active logo must visibly advance')
-            s.wait_screen('Fertig')
+            s.wait_screen('Done')
             s.wait_screen('> printf')
             s.read(.1)
             before=len(s.output)
@@ -378,7 +378,7 @@ class TerminalTests(unittest.TestCase):
             s.read(.8)
             self.assertEqual(len(s.output),before,'completed reply must stop timer redraws')
             self.assertEqual(s.text(),finished)
-            self.assertIn('Fertig',s.text())
+            self.assertIn('Done',s.text())
         finally:s.close()
 
     def test_model_picker_escape_then_dialog_escape(self):
@@ -386,11 +386,11 @@ class TerminalTests(unittest.TestCase):
         try:
             s.wait_screen('GPT-6 Luna')
             self.assert_compact(s)
-            s.send(b'\x0f');s.wait_screen('Modellwahl')
+            s.send(b'\x0f');s.wait_screen('Choose model')
             self.assert_compact(s)
-            s.send(b'\x1b');s.wait_screen('Frag nach einem Befehl.')
+            s.send(b'\x1b');s.wait_screen('Ask for a command.')
             self.assertIsNone(s.proc.poll())
-            self.assertNotIn('Modellwahl',s.text())
+            self.assertNotIn('Choose model',s.text())
             s.send(b'\x1b');s.wait()
             self.assertEqual(s.proc.returncode,2)
             self.assertFalse(s.result.exists())
@@ -402,7 +402,7 @@ class TerminalTests(unittest.TestCase):
             try:
                 s.wait_screen('GPT-6 Luna')
                 s.send(b'\x0f');s.wait_screen('GPT-6 Sol')
-                s.send(b'\x1b[B\r');s.wait_screen('Modell gespeichert')
+                s.send(b'\x1b[B\r');s.wait_screen('Model saved')
                 saved=json.loads((Path(config)/'amber-shell/settings.json').read_text())
                 self.assertEqual(saved['model'],'gpt-6-sol')
                 s.send(b'\x03');s.wait()
@@ -416,21 +416,21 @@ class TerminalTests(unittest.TestCase):
     def test_history_tab_arrows_and_enter_without_page_keys(self):
         s=Session()
         try:
-            s.wait_status('Kontext');s.send(b'a\r');s.wait_screen('Frag nach einem Befehl.')
+            s.wait_status('Context');s.send(b'a\r');s.wait_screen('Ask for a command.')
             for number in range(3):
-                s.send(f'Verlauf-Frage-{number}\r')
-                s.wait_screen('Antwort läuft')
-                s.wait_screen('Fertig')
+                s.send(f'History-question-{number}\r')
+                s.wait_screen('Streaming')
+                s.wait_screen('Done')
                 s.wait_screen('> printf')
                 self.assert_compact(s)
-            s.send(b'\t');s.wait_status('Verlauf')
-            s.send(b'\x1b[A'*20);s.wait_screen('Du:    Verlauf-Frage-0')
+            s.send(b'\t');s.wait_status('History')
+            s.send(b'\x1b[A'*20);s.wait_screen('You:   History-question-0')
             self.assertNotIn('PgUp',s.text())
-            s.send(b'\x1b[B'*20);s.wait_screen('Du:    Verlauf-Frage-2')
+            s.send(b'\x1b[B'*20);s.wait_screen('You:   History-question-2')
             s.send(b'\x1b[D');s.read(.1)
             s.send(b'\r');s.wait()
             self.assertEqual(s.proc.returncode,0)
-            self.assertEqual(s.result.read_bytes(),b"printf '%s\\n' 'amber-shell bereit'\0")
+            self.assertEqual(s.result.read_bytes(),b"printf '%s\\n' 'amber-shell ready'\0")
         finally:s.close()
 
     def test_inline_stream_resize_transfer_and_cleanup(self):
@@ -440,7 +440,7 @@ class TerminalTests(unittest.TestCase):
             s.read(.2);s.resize(40,12);s.read(.2);s.resize(10,3);s.read(.2);s.resize(80,24)
             s.wait_screen('> printf');s.send(b'\x19');s.wait(timeout=5);s.read()
             self.assertEqual(s.proc.returncode,0)
-            self.assertEqual(s.result.read_bytes(),b"printf '%s\\n' 'amber-shell bereit'\0")
+            self.assertEqual(s.result.read_bytes(),b"printf '%s\\n' 'amber-shell ready'\0")
             self.assertEqual(termios.tcgetattr(s.slave),s.old)
             self.assertNotIn(b'\x1b[?1049h',s.output)
             self.assertNotIn(b'\x1b[3J',s.output)
@@ -470,7 +470,7 @@ class TerminalTests(unittest.TestCase):
             self.assertEqual(s.proc.returncode,2)
             self.assertFalse(s.result.exists())
             self.assertEqual(termios.tcgetattr(s.slave),s.old)
-            self.assertNotIn(b'Fertig',s.output,'cancellation must not report completion')
+            self.assertNotIn(b'Done',s.output,'cancellation must not report completion')
         finally:s.close()
 
 if __name__=='__main__':unittest.main()

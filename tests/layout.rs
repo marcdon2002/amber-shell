@@ -85,11 +85,11 @@ fn model_and_actions_remain_discoverable_without_page_keys() {
     let wide = screen(100, 9, &mut app);
     assert!(wide.contains("GPT-6 Luna"));
     assert!(wide.contains("Ctrl-O"));
-    assert!(wide.contains("Frage"));
+    assert!(wide.contains("Question"));
     assert!(!wide.contains("^Y"));
     app.command_focus = true;
     let history = screen(100, 9, &mut app);
-    assert!(history.contains("lesen"));
+    assert!(history.contains("read"));
     assert!(history.contains("Enter"));
     let narrow = screen(40, 9, &mut app);
     assert!(narrow.contains("Luna"));
@@ -181,15 +181,15 @@ fn ascii_composer_keeps_focus_and_terminal_bold_without_color() {
     let rows: Vec<String> = (0..14)
         .map(|y| (0..40).map(|x| b[(x, y)].symbol()).collect())
         .collect();
-    assert!(rows.iter().any(|r| r.contains("Fertig")));
-    assert!(rows.iter().any(|r| r.contains("+ Rückfrage ")));
+    assert!(rows.iter().any(|r| r.contains("Done")));
+    assert!(rows.iter().any(|r| r.contains("+ Follow-up ")));
     let y = rows.iter().position(|r| r.contains("printf test")).unwrap() as u16;
     for x in 12..23 {
         assert!(b[(x, y)].modifier.contains(Modifier::BOLD));
     }
     let input_y = rows
         .iter()
-        .position(|r| r.contains("Deine Rückfrage"))
+        .position(|r| r.contains("Your follow-up"))
         .unwrap() as u16;
     assert_eq!(app.cursor_row, input_y);
     assert!(rows[(input_y - 1) as usize].contains('+'));
@@ -212,13 +212,13 @@ fn grouped_dialogue_preserves_the_original_rounded_input() {
     .unwrap();
     for width in [40, 100] {
         let text = screen(width, 20, &mut app);
-        assert!(text.contains("Du:    Wie geht das?"), "{text}");
+        assert!(text.contains("You:   Wie geht das?"), "{text}");
         assert!(text.contains("Amber: Eine kurze Antwort."), "{text}");
-        assert!(!text.contains("-- Antwort --"), "{text}");
-        assert!(!text.contains("-- Befehl --"), "{text}");
-        assert!(text.contains("╭ Rückfrage "), "{text}");
-        assert!(text.contains("Deine Rückfrage …"), "{text}");
-        assert!(text.contains("Enter senden · Tab"), "{text}");
+        assert!(!text.contains("-- Answer --"), "{text}");
+        assert!(!text.contains("-- Command --"), "{text}");
+        assert!(text.contains("╭ Follow-up "), "{text}");
+        assert!(text.contains("Your follow-up …"), "{text}");
+        assert!(text.contains("Enter send · Tab"), "{text}");
         assert_eq!(app.selected_command(), Some(command));
     }
 }
@@ -314,7 +314,7 @@ fn narrow_view_keeps_command_head_and_can_scroll_to_its_end() {
     .unwrap();
     let shown = screen(40, 14, &mut app);
     assert!(shown.contains("> printf"), "{shown}");
-    assert!(shown.contains("weiter"), "{shown}");
+    assert!(shown.contains("more"), "{shown}");
     let mut found = false;
     for _ in 0..20 {
         app.scroll_delta = 1;
@@ -457,7 +457,7 @@ fn tiny_header_keeps_status_and_simulation_badge_readable() {
     let mut app = App::new(std::array::from_fn(|_| String::new()), false);
     app.editor.insert("Test");
     app.begin().unwrap();
-    assert!(screen(24, 14, &mut app).contains("Wartet"));
+    assert!(screen(24, 14, &mut app).contains("Waiting"));
     app.delta("{").unwrap();
     assert!(screen(24, 14, &mut app).contains("Stream"));
     app.complete(Reply {
@@ -465,7 +465,7 @@ fn tiny_header_keeps_status_and_simulation_badge_readable() {
         command: "printf test".into(),
     })
     .unwrap();
-    assert!(screen(24, 14, &mut app).contains("Fertig"));
+    assert!(screen(24, 14, &mut app).contains("Done"));
     app.simulated = true;
     app.fast = true;
     for width in [24, 38, 40] {
@@ -614,12 +614,12 @@ fn overlong_latest_answer_keeps_question_and_marks_hidden_answer_lines() {
     .unwrap();
     let shown = screen(40, 18, &mut app);
     assert!(shown.contains("AKTUELLE_FRAGE"));
-    assert!(shown.contains("frühere Zeilen"));
+    assert!(shown.contains("earlier lines"));
     assert!(shown.contains("printf newest"));
     app.scroll_delta = -3;
     let manual = screen(40, 18, &mut app);
     assert!(
-        !manual.contains("frühere Zeilen"),
+        !manual.contains("earlier lines"),
         "manual scroll must retain its own reading anchor"
     );
 }

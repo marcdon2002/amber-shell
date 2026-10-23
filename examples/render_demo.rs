@@ -110,14 +110,14 @@ impl Demo {
             duration_ms,
             step: if handoff { 3 } else { 0 },
             title: if handoff {
-                "Dein Befehl. Bereit zum Bearbeiten."
+                "Your command. Ready to edit."
             } else {
-                "Ein Assistent. Direkt in deinem Terminal."
+                "An assistant. Right in your terminal."
             },
             hint: if handoff {
-                "Erst Enter in der Shell führt ihn aus."
+                "Press Enter in the shell to run it."
             } else {
-                "Amber am freien Shell-Prompt öffnen."
+                "Open Amber at the shell prompt."
             },
             key,
             cells,
@@ -152,16 +152,16 @@ impl Demo {
             duration_ms,
             step,
             title: match step {
-                0 => "Ein Assistent. Direkt in deinem Terminal.",
-                1 => "Frag in deinen eigenen Worten.",
-                2 => "Frag nach. Amber bleibt im Gespräch.",
-                _ => "Dein Terminal. Deine Entscheidung.",
+                0 => "An assistant. Right in your terminal.",
+                1 => "Ask in your own words.",
+                2 => "Ask a follow-up. Amber remembers.",
+                _ => "Your terminal. Your choice.",
             },
             hint: match step {
-                0 => "Amber am freien Shell-Prompt öffnen.",
-                1 => "Erst der einfache Befehl. Klar erklärt.",
-                2 => "Mehr Details, wenn du sie brauchst.",
-                _ => "Befehl mit Ctrl-Y in die Shell übernehmen.",
+                0 => "Open Amber at the shell prompt.",
+                1 => "A simple command. Clearly explained.",
+                2 => "More detail when you need it.",
+                _ => "Use Ctrl-Y to move it to the shell.",
             },
             key,
             cells,
@@ -225,26 +225,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     app.reduced_motion = false;
     demo.amber(&mut app, 900, 0, "Ctrl-X  →  Ctrl-A", true)?;
     demo.amber(&mut app, 450, 1, "", true)?;
-    demo.type_question(&mut app, "Wie liste ich Dateien und Ordner auf?", 1)?;
-    demo.answer(&mut app, "ls zeigt Dateien und Ordner.", "ls", 1)?;
-    demo.type_question(&mut app, "Auch die versteckten?", 2)?;
-    demo.answer(
-        &mut app,
-        "Mit -a siehst du auch versteckte Einträge.",
-        "ls -a",
-        2,
-    )?;
+    demo.type_question(&mut app, "How do I list files and folders?", 1)?;
+    demo.answer(&mut app, "ls lists files and folders.", "ls", 1)?;
+    demo.type_question(&mut app, "And hidden ones?", 2)?;
+    demo.answer(&mut app, "Use -a to include hidden entries.", "ls -a", 2)?;
     demo.amber(&mut app, 800, 3, "Ctrl-Y", false)?;
     let command = app
         .selected_command()
         .ok_or("No complete command to transfer")?
         .to_owned();
     assert_eq!(command, "ls -a");
-    demo.shell(&command, 600, "Editierbar am Prompt", true)?;
+    demo.shell(&command, 600, "Editable at the prompt", true)?;
     // A small manual edit makes the editable handoff visible; still no Enter.
-    demo.shell(&format!("{command}l"), 650, "Befehl bearbeiten", true)?;
-    demo.shell(&command, 900, "Noch nicht ausgeführt", true)?;
-    demo.shell(&command, 550, "Noch nicht ausgeführt", false)?;
+    demo.shell(&format!("{command}l"), 650, "Edit command", true)?;
+    demo.shell(&command, 900, "Not executed yet", true)?;
+    demo.shell(&command, 550, "Not executed yet", false)?;
     let path = Path::new(&output);
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent)?;

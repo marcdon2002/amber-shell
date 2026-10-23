@@ -17,7 +17,7 @@ fn option(args: &[String], key: &str) -> Result<Option<String>, String> {
             .get(i + 1)
             .cloned()
             .map(Some)
-            .ok_or_else(|| format!("Wert für {key} fehlt")),
+            .ok_or_else(|| format!("Missing value for {key}")),
         None => Ok(None),
     }
 }
@@ -30,7 +30,7 @@ fn main() {
             1
         }
         Err(_) => {
-            eprintln!("amber-shell: Interner Fehler; Terminal wiederhergestellt.");
+            eprintln!("amber-shell: Internal error; terminal restored.");
             1
         }
     };
@@ -52,7 +52,7 @@ fn entry() -> Result<i32, String> {
         std::env::var("AMBER_CODEX_BIN").unwrap_or_else(|_| "/opt/homebrew/bin/codex".into());
     if args.iter().any(|s| s == "--help" || s == "-h") {
         println!(
-            "amber-shell — kompakter Assistent für zsh / Apple Terminal\n\nOhne Argument: Inline-Dialog mit direkter Frageeingabe\n  --simulate                 Synthetische Antworten, kein Netzwerk\n  --history-file PFAD         NUL-getrennte Shell-Befehle (max. 32 KiB)\n  --capture-socket PFAD       Begrenzte Ausgaben der aktuellen Sitzung\n  --result-file PFAD          Originalbefehl + NUL, nur bei Übernahme\n  session -- /bin/zsh -i      Shell mit Ausgabeerfassung starten\n  login                      Offizielles codex login\n  doctor                     Codex-Version und offizieller Loginstatus\n  ask --question TEXT         Nichtinteraktive Diagnose, JSON-Antwort\n      --model ID              Explizites Modell für diese Diagnose\n      --fast                  Unterstützten Fast-Tier verwenden\n      --context-file PFAD     Bewusst gewählter Kontext (max. 48 KiB)\n      --conversation-file P   JSON-Paare aus Fragen/Antworten\n\nTasten: Ctrl-X Ctrl-A öffnet ZLE-Widget; Enter fragt; Ctrl-Y übernimmt;\nEsc/Ctrl-C brechen ab; Tab und Pfeile lesen/wählen; Ctrl-O wählt Modell/Fast; Ctrl-K bearbeitet den Kontext.\nAusführen erst nach Rückkehr mit normalem Enter in der Shell."
+            "amber-shell — compact assistant for zsh / Apple Terminal\n\nNo arguments: Inline chat with direct question input\n  --simulate                 Simulated replies, no network\n  --history-file PATH         NUL-separated shell commands (max. 32 KiB)\n  --capture-socket PATH       Bounded output from the current session\n  --result-file PATH          Original command + NUL, only on acceptance\n  session -- /bin/zsh -i      Start a shell with output capture\n  login                      Official codex login\n  doctor                     Codex version and official login status\n  ask --question TEXT         Noninteractive diagnostic, JSON reply\n      --model ID              Explicit model for this diagnostic\n      --fast                  Use the supported Fast tier\n      --context-file PATH     Explicitly selected context (max. 48 KiB)\n      --conversation-file P   JSON pairs of questions/replies\n\nKeys: Ctrl-X Ctrl-A opens the ZLE widget; Enter asks; Ctrl-Y accepts;\nEsc/Ctrl-C cancel; Tab and arrows browse/select; Ctrl-O selects model/Fast; Ctrl-K edits context.\nPress Enter at the normal shell prompt to execute the accepted command."
         );
         return Ok(0);
     }
@@ -82,9 +82,9 @@ fn entry() -> Result<i32, String> {
     }
     let simulated = args.iter().any(|s| s == "--simulate");
     if args.first().is_some_and(|s| s == "ask") {
-        let question = option(&args, "--question")?.ok_or("--question erforderlich")?;
+        let question = option(&args, "--question")?.ok_or("--question is required")?;
         if question.len() > 8192 || question.trim().is_empty() {
-            return Err("Frage leer oder größer als 8 KiB".into());
+            return Err("Question is empty or exceeds 8 KiB".into());
         }
         let context = option(&args, "--context-file")?
             .map(|p| read_bounded(&p, 48 * 1024))
@@ -112,7 +112,7 @@ fn entry() -> Result<i32, String> {
         let until = Instant::now() + Duration::from_secs(180);
         loop {
             if Instant::now() > until {
-                return Err("Zeitlimit für Modellantwort erreicht".into());
+                return Err("Model response timed out".into());
             }
             match handle.events.recv_timeout(Duration::from_millis(200)) {
                 Ok(ProviderEvent::Complete(reply)) => {
@@ -126,7 +126,7 @@ fn entry() -> Result<i32, String> {
                 Ok(ProviderEvent::Error(e)) => return Err(e),
                 Ok(ProviderEvent::Delta(_)) => {}
                 Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {}
-                Err(_) => return Err("Provider beendet".into()),
+                Err(_) => return Err("Provider disconnected".into()),
             }
         }
     }
@@ -150,7 +150,7 @@ fn entry() -> Result<i32, String> {
     };
     let mut app = App::from_shell_context_with_outputs(&cwd, &history, &outputs, simulated);
     if let Some(error) = capture_error {
-        app.status = format!("Ausgabenkontext: {error}");
+        app.status = format!("Output context: {error}");
     }
     app.history_cwd = Some(cwd.clone());
     match amber_shell::history::load_for_mode(&cwd, simulated) {
@@ -168,7 +168,7 @@ fn entry() -> Result<i32, String> {
                 })
                 .collect()
         }
-        Err(error) => app.status = format!("Lokaler Verlauf: {error}"),
+        Err(error) => app.status = format!("Local history: {error}"),
     }
     let settings = amber_shell::settings::load()?;
     app.model_id = settings.model;
@@ -179,7 +179,7 @@ fn entry() -> Result<i32, String> {
             validate_command(&command)?;
             if let Some(path) = option(&args, "--result-file")? {
                 let path = PathBuf::from(path);
-                let parent = path.parent().ok_or("Ungültiger Ergebnispfad")?;
+                let parent = path.parent().ok_or("Invalid result path")?;
                 let mut temp =
                     tempfile::NamedTempFile::new_in(parent).map_err(|e| e.to_string())?;
                 temp.write_all(command.as_bytes())
@@ -202,14 +202,14 @@ fn read_bounded(path: &str, limit: usize) -> Result<String, String> {
         .open(path)
         .map_err(|e| e.to_string())?;
     if !file.metadata().map_err(|e| e.to_string())?.is_file() {
-        return Err("Kontext muss reguläre Datei sein".into());
+        return Err("Context must be a regular file".into());
     }
     let mut bytes = vec![];
     file.take(limit as u64 + 1)
         .read_to_end(&mut bytes)
         .map_err(|e| e.to_string())?;
     if bytes.len() > limit {
-        return Err("Eingabedatei überschreitet Größenlimit".into());
+        return Err("Input file exceeds the size limit".into());
     }
-    String::from_utf8(bytes).map_err(|_| "Eingabedatei ist kein UTF-8".into())
+    String::from_utf8(bytes).map_err(|_| "Input file is not UTF-8".into())
 }

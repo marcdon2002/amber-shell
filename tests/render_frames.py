@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Render actual Ratatui TestBackend cell JSON as labeled PNG artifacts.
 
-This is a deterministic Terminal-Test-Render, not a native terminal screenshot.
+This is a deterministic Terminal test render, not a native terminal screenshot.
 Usage: python3 tests/render_frames.py work/render-baseline [--output DIR]
 Pillow can be installed locally under work/testdeps. Colors marked Reset use
 an explicit dark terminal palette; actual terminal profile colors may differ.
@@ -59,7 +59,7 @@ def render(source, output, font_path, size):
     image = Image.new('RGB', (width * cell_width + padding * 2,
                              height * cell_height + padding * 2 + heading), '#181818')
     draw = ImageDraw.Draw(image)
-    draw.text((padding, 10), f"Terminal-Test-Render · {data['state']} · {width}×{height}",
+    draw.text((padding, 10), f"Terminal test render · {data['state']} · {width}×{height}",
               font=font, fill='#cccccc')
     # Draw backgrounds first so wide glyphs aren't erased by the following cell.
     for index, cell in enumerate(cells):

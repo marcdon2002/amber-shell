@@ -37,7 +37,7 @@ struct Guard {
 impl Guard {
     fn enter() -> Result<Self, String> {
         if !io::stdin().is_terminal() || !io::stdout().is_terminal() {
-            return Err("Interaktives Terminal erforderlich".into());
+            return Err("Interactive terminal required".into());
         }
         let mut previous = std::mem::MaybeUninit::uninit();
         if unsafe { libc::tcgetattr(0, previous.as_mut_ptr()) } != 0 {
@@ -197,7 +197,7 @@ pub fn run(mut app: App, simulated: bool) -> Result<Option<String>, String> {
                         .unwrap_or(0);
                     app.models = models;
                     if app.models.is_empty() {
-                        app.model_error = "Keine verfügbaren Modelle. Ctrl-O lädt erneut.".into();
+                        app.model_error = "No models available. Ctrl-O reloads.".into();
                     }
                 }
                 Err(error) => app.model_error = error,
@@ -236,8 +236,7 @@ pub fn run(mut app: App, simulated: bool) -> Result<Option<String>, String> {
                             if let Err(error) =
                                 crate::history::record_mode(cwd, entry, app.simulated)
                             {
-                                app.status =
-                                    format!("Verlauf konnte nicht gespeichert werden: {error}");
+                                app.status = format!("Could not save history: {error}");
                             }
                         }
                         dirty = true;
@@ -253,7 +252,7 @@ pub fn run(mut app: App, simulated: bool) -> Result<Option<String>, String> {
                     Err(std::sync::mpsc::TryRecvError::Empty) => break,
                     Err(std::sync::mpsc::TryRecvError::Disconnected) => {
                         if app.active {
-                            app.fail("Provider-Verbindung beendet".into());
+                            app.fail("Provider connection closed".into());
                         }
                         dirty = true;
                         finished = true;
@@ -311,7 +310,7 @@ pub fn run(mut app: App, simulated: bool) -> Result<Option<String>, String> {
             Event::Paste(text) if !app.reviewing && !app.model_picker => {
                 app.leave_history();
                 if !app.editor.insert(&text) {
-                    app.status = "Eingabe überschreitet 8 KiB; Einfügen verworfen".into();
+                    app.status = "Input exceeds 8 KiB; paste discarded".into();
                 }
                 dirty = true;
             }
@@ -349,7 +348,7 @@ pub fn run(mut app: App, simulated: bool) -> Result<Option<String>, String> {
                 }
                 if ctrl && key.code == KeyCode::Char('o') {
                     if app.active {
-                        app.status = "Modellwechsel nach der laufenden Antwort möglich".into();
+                        app.status = "Model change available after the current answer".into();
                     } else {
                         app.model_picker = true;
                         app.picker_fast = app.fast;
@@ -392,10 +391,10 @@ pub fn run(mut app: App, simulated: bool) -> Result<Option<String>, String> {
                                         app.fast = fast;
                                         app.model_picker = false;
                                         app.status = if disabled {
-                                            "Modell gespeichert · Fast nicht verfügbar, Standard aktiv".into()
+                                            "Model saved · Fast unavailable, Standard active".into()
                                         } else {
                                             format!(
-                                                "Modell gespeichert: {} · {}",
+                                                "Model saved: {} · {}",
                                                 model.label,
                                                 if fast { "Fast" } else { "Standard" }
                                             )
@@ -492,13 +491,14 @@ pub fn run(mut app: App, simulated: bool) -> Result<Option<String>, String> {
                         if let Some(command) = app.selected_command() {
                             return Ok(Some(command.to_owned()));
                         }
-                        app.status = "Noch kein vollständiger Befehl".into();
+                        app.status = "No complete command yet".into();
                     }
                     KeyCode::Enter if app.command_focus => {
                         if let Some(command) = app.selected_command() {
                             return Ok(Some(command.to_owned()));
                         }
-                        app.status = "Noch kein fertiger Befehl. Tab führt zur Frage.".into();
+                        app.status =
+                            "No complete command yet. Tab returns to your question.".into();
                     }
                     KeyCode::Enter => match app.begin() {
                         Ok((question, conversation)) => {
@@ -546,6 +546,6 @@ pub fn run(mut app: App, simulated: bool) -> Result<Option<String>, String> {
 
 fn insert_input(app: &mut App, text: &str) {
     if !app.editor.insert(text) {
-        app.status = "Eingabe erreicht 8 KiB".into();
+        app.status = "Input limit reached (8 KiB)".into();
     }
 }

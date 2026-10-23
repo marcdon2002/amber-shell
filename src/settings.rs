@@ -31,9 +31,9 @@ impl ContextMode {
     }
     pub fn label(self) -> &'static str {
         match self {
-            Self::Automatic => "Automatisch",
-            Self::Terminal => "Nur Terminal",
-            Self::Off => "Aus",
+            Self::Automatic => "Automatic",
+            Self::Terminal => "Terminal only",
+            Self::Off => "Off",
         }
     }
 }
@@ -67,11 +67,13 @@ pub fn save(settings: &Settings) -> Result<(), String> {
 fn settings_directory(xdg: Option<OsString>, home: Option<OsString>) -> Result<PathBuf, String> {
     let base = match xdg.filter(|v| !v.is_empty()) {
         Some(path) => PathBuf::from(path),
-        None => PathBuf::from(home.ok_or("HOME fehlt; Einstellungsordner nicht bestimmbar.")?)
-            .join(".config"),
+        None => {
+            PathBuf::from(home.ok_or("HOME is missing; cannot determine the settings directory.")?)
+                .join(".config")
+        }
     };
     if !base.is_absolute() {
-        return Err("Der Einstellungsordner muss ein absoluter Pfad sein.".into());
+        return Err("The settings directory must be an absolute path.".into());
     }
     Ok(base.join("amber-shell"))
 }
@@ -94,13 +96,12 @@ pub fn save_model(model: &str) -> Result<(), String> {
 
 fn open_directory(path: &Path, create: bool) -> Result<Option<File>, String> {
     if create {
-        let parent = path.parent().ok_or("Ungültiger Einstellungsordner.")?;
-        fs::create_dir_all(parent)
-            .map_err(|_| "Einstellungsordner konnte nicht erstellt werden.")?;
+        let parent = path.parent().ok_or("Invalid settings directory.")?;
+        fs::create_dir_all(parent).map_err(|_| "Could not create the settings directory.")?;
         match fs::DirBuilder::new().mode(0o700).create(path) {
             Ok(()) => {}
             Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {}
-            Err(_) => return Err("Einstellungsordner konnte nicht erstellt werden.".into()),
+            Err(_) => return Err("Could not create the settings directory.".into()),
         }
     }
     let directory = match OpenOptions::new()
@@ -112,16 +113,15 @@ fn open_directory(path: &Path, create: bool) -> Result<Option<File>, String> {
         Err(e) if e.kind() == std::io::ErrorKind::NotFound && !create => return Ok(None),
         Err(_) => {
             return Err(
-                "Unsicherer oder nicht lesbarer Einstellungsordner (keine Symlinks erlaubt)."
-                    .into(),
+                "Unsafe or unreadable settings directory (symlinks are not allowed).".into(),
             );
         }
     };
     let metadata = directory
         .metadata()
-        .map_err(|_| "Einstellungsordner konnte nicht geprüft werden.")?;
+        .map_err(|_| "Could not inspect the settings directory.")?;
     if metadata.uid() != unsafe { libc::geteuid() } || metadata.mode() & 0o022 != 0 {
-        return Err("Einstellungsordner muss dem aktuellen Benutzer gehören und darf nicht fremd beschreibbar sein.".into());
+        return Err("The settings directory must belong to the current user and must not be writable by others.".into());
     }
     Ok(Some(directory))
 }
@@ -139,18 +139,21 @@ fn existing_settings(directory: &File) -> Result<Option<File>, String> {
         if std::io::Error::last_os_error().kind() == std::io::ErrorKind::NotFound {
             return Ok(None);
         }
-        return Err("Unsichere oder nicht lesbare settings.json (keine Symlinks erlaubt).".into());
+        return Err("Unsafe or unreadable settings.json (symlinks are not allowed).".into());
     }
     let file = unsafe { File::from_raw_fd(fd) };
     let metadata = file
         .metadata()
-        .map_err(|_| "settings.json konnte nicht geprüft werden.")?;
+        .map_err(|_| "Could not inspect settings.json.")?;
     if !metadata.is_file()
         || metadata.uid() != unsafe { libc::geteuid() }
         || metadata.nlink() != 1
         || metadata.len() > 4096
     {
-        return Err("settings.json muss eine eigene reguläre Datei bis 4 KiB sein.".into());
+        return Err(
+            "settings.json must be a regular file owned by the current user, no larger than 4 KiB."
+                .into(),
+        );
     }
     Ok(Some(file))
 }
@@ -183,19 +186,19 @@ fn load_settings_from(path: &Path) -> Result<Settings, String> {
     let mut bytes = Vec::new();
     file.take(4097)
         .read_to_end(&mut bytes)
-        .map_err(|_| "settings.json konnte nicht gelesen werden.")?;
+        .map_err(|_| "Could not read settings.json.")?;
     if bytes.len() > 4096 {
-        return Err("settings.json überschreitet das Limit.".into());
+        return Err("settings.json exceeds the size limit.".into());
     }
     let settings: Settings = serde_json::from_slice(&bytes)
-        .map_err(|_| "Ungültige settings.json; Modellwahl bitte neu speichern.")?;
+        .map_err(|_| "Invalid settings.json; save your model selection again.")?;
     validate_model_id(&settings.model)?;
     Ok(settings)
 }
 
 fn save_settings_to(path: &Path, settings: &Settings) -> Result<(), String> {
     validate_model_id(&settings.model)?;
-    let directory = open_directory(path, true)?.ok_or("Einstellungsordner fehlt.")?;
+    let directory = open_directory(path, true)?.ok_or("The settings directory is missing.")?;
     existing_settings(&directory)?;
     static SEQUENCE: AtomicU64 = AtomicU64::new(0);
     let mut temporary = None;
@@ -219,18 +222,17 @@ fn save_settings_to(path: &Path, settings: &Settings) -> Result<(), String> {
             break;
         }
         if std::io::Error::last_os_error().kind() != std::io::ErrorKind::AlreadyExists {
-            return Err("Temporäre Einstellungsdatei konnte nicht erstellt werden.".into());
+            return Err("Could not create a temporary settings file.".into());
         }
     }
-    let (name, mut file) =
-        temporary.ok_or("Temporäre Einstellungsdatei konnte nicht erstellt werden.")?;
+    let (name, mut file) = temporary.ok_or("Could not create a temporary settings file.")?;
     let result = (|| -> Result<(), String> {
         let bytes = serde_json::to_vec_pretty(settings)
-            .map_err(|_| "Modellwahl konnte nicht serialisiert werden.")?;
+            .map_err(|_| "Could not serialize the model selection.")?;
         file.write_all(&bytes)
             .and_then(|_| file.write_all(b"\n"))
             .and_then(|_| file.sync_all())
-            .map_err(|_| "Modellwahl konnte nicht gespeichert werden.")?;
+            .map_err(|_| "Could not save the model selection.")?;
         // Both names are resolved against the opened directory, even if its path is replaced.
         if unsafe {
             libc::renameat(
@@ -241,11 +243,11 @@ fn save_settings_to(path: &Path, settings: &Settings) -> Result<(), String> {
             )
         } != 0
         {
-            return Err("Modellwahl konnte nicht atomar ersetzt werden.".into());
+            return Err("Could not atomically replace the model selection.".into());
         }
         directory
             .sync_all()
-            .map_err(|_| "Einstellungsordner konnte nicht synchronisiert werden.".to_string())
+            .map_err(|_| "Could not synchronize the settings directory.".to_string())
     })();
     unsafe {
         libc::unlinkat(directory.as_raw_fd(), name.as_ptr(), 0);

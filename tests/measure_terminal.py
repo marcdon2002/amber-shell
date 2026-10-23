@@ -87,7 +87,7 @@ def main():
     parser.add_argument('--binary',type=Path,default=harness.ROOT/'target/release/amber-shell')
     parser.add_argument('--output',type=Path,required=True)
     parser.add_argument('--cwd',type=Path,help='Optional project directory for startup/context measurements')
-    parser.add_argument('--question',default='Synthetische Messfrage',help='Synthetic question prefix; use a project question to measure lazy discovery')
+    parser.add_argument('--question',default='Synthetic measurement question',help='Synthetic question prefix; use a project question to measure lazy discovery')
     parser.add_argument('--idle-seconds',type=float,default=8)
     parser.add_argument('--launches',type=int,default=10)
     parser.add_argument('--responses',type=int,default=5)
@@ -115,8 +115,8 @@ def main():
             while time.monotonic()<deadline:
                 session.read(.05)
                 snapshots.append(sample(session.proc.pid))
-                saw_active |= 'Antwort läuft' in session.text()
-                if saw_active and 'Fertig' in session.status_text():break
+                saw_active |= 'Streaming' in session.text()
+                if saw_active and 'Done' in session.status_text():break
             else:raise AssertionError('simulated response did not finish')
             response_ms.append(round((time.monotonic()-started)*1000,3))
         active=summarize(snapshots,len(session.output)-output_start)

@@ -20,7 +20,7 @@ TERMINAL = '#111111'
 ACCENT = '#ffd7af'
 TEXT = '#ededed'
 MUTED = '#a7a7a7'
-STEPS = ['Öffnen', 'Fragen', 'Nachfragen', 'Übernehmen']
+STEPS = ['Open', 'Ask', 'Follow up', 'Use command']
 
 
 def fonts(font_path, size):
@@ -92,7 +92,7 @@ def render_frame(data, shot, font_set):
                   fill=ACCENT if active else '#3d3d3d', width=2)
         draw.text((x, bottom + 80), f'{index + 1:02d}  {label}', font=small,
                   fill=ACCENT if active else MUTED)
-    note = 'Ratatui-Render · Simulierte Antworten · Keine automatische Ausführung'
+    note = 'Ratatui render · Simulated replies · Commands are not executed'
     draw.text((32, bottom + 105), note, font=disclosure, fill=MUTED)
     return image
 

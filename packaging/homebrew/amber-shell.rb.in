@@ -33,7 +33,7 @@ class AmberShell < Formula
 
   test do
     assert_equal "amber-shell #{version}\n", shell_output("#{bin}/amber-shell --version")
-    assert_match "Inline-Dialog", shell_output("#{bin}/amber-shell --help")
+    assert_match "Inline chat", shell_output("#{bin}/amber-shell --help")
     system "/bin/zsh", "-n", pkgshare/"amber-shell.zsh"
     system "/bin/zsh", "-n", pkgshare/"amber-session.zsh"
     (testpath/"zsh").mkpath

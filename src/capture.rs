@@ -198,7 +198,7 @@ impl CaptureBuffer {
         let (output, omitted_reason) = if active.interactive {
             (
                 String::new(),
-                Some("Interaktive Eingabe oder Vollbildansicht: Ausgabe ausgelassen.".into()),
+                Some("Interactive input or full-screen view: output omitted.".into()),
             )
         } else {
             let mut bytes: Vec<_> = active.tail.into_iter().collect();
@@ -263,12 +263,12 @@ pub fn query(path: &Path) -> Result<Vec<CaptureRecord>, String> {
         fs::{FileTypeExt, MetadataExt},
         net::UnixStream,
     };
-    let meta = std::fs::symlink_metadata(path).map_err(|_| "Ausgabenkontext nicht verfügbar")?;
+    let meta = std::fs::symlink_metadata(path).map_err(|_| "Output context is unavailable")?;
     if !meta.file_type().is_socket()
         || meta.uid() != unsafe { libc::geteuid() }
         || meta.mode() & 0o077 != 0
     {
-        return Err("Unsicherer Ausgabenkontext-Socket".into());
+        return Err("Unsafe output context socket".into());
     }
     let mut stream = UnixStream::connect(path).map_err(|e| e.to_string())?;
     stream
@@ -284,11 +284,11 @@ pub fn query(path: &Path) -> Result<Vec<CaptureRecord>, String> {
         .read_to_end(&mut data)
         .map_err(|e| e.to_string())?;
     if data.len() > SNAPSHOT_LIMIT {
-        return Err("Ausgabenkontext überschreitet Limit".into());
+        return Err("Output context exceeds the size limit".into());
     }
     let records: Vec<CaptureRecord> = serde_json::from_slice(&data).map_err(|e| e.to_string())?;
     if records.iter().any(|record| !safe_record(record)) {
-        return Err("Ungültiger Ausgabenkontext".into());
+        return Err("Invalid output context".into());
     }
     Ok(records)
 }

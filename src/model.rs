@@ -9,16 +9,16 @@ pub struct Reply {
 
 pub fn validate_command(command: &str) -> Result<(), String> {
     if command.trim().is_empty() {
-        return Err("Leerer Befehl".into());
+        return Err("Empty command".into());
     }
     if command.len() > 16 * 1024 {
-        return Err("Befehl überschreitet 16 KiB".into());
+        return Err("Command exceeds 16 KiB".into());
     }
     if command
         .chars()
         .any(|c| c.is_control() && c != '\n' && c != '\t')
     {
-        return Err("Befehl enthält unzulässige Steuerzeichen".into());
+        return Err("Command contains unsupported control characters".into());
     }
     Ok(())
 }
@@ -269,14 +269,14 @@ impl App {
             "{}{}",
             payload.details,
             if limited {
-                "\n\nProjektsuche begrenzt; weitere Unterordner können fehlen. Bei Bedarf den genauen Ordner nennen oder dorthin wechseln."
+                "\n\nProject search limited; some subfolders may be missing. Specify the exact folder or change to it if needed."
             } else {
                 ""
             }
         );
         self.contexts[self.context_choice] = payload.text;
         if limited {
-            self.contexts[self.context_choice].push_str("\nProjektsuche begrenzt (Tiefe/Anzahl/Zeit). Nicht gefundene Skripte nicht erfinden; bei unklarer Projektwahl nach dem Ordner fragen.\n");
+            self.contexts[self.context_choice].push_str("\nProject search limited (depth/count/time). Do not invent missing scripts; ask for the folder if the project is unclear.\n");
         }
     }
     pub fn selected_context(&self) -> &str {
@@ -308,15 +308,12 @@ impl App {
         }
         text.push('\n');
         if !self.context_error.is_empty() {
-            text.push_str(&format!(
-                "Einstellung nicht gespeichert:\n{}\n\n",
-                self.context_error
-            ));
+            text.push_str(&format!("Setting not saved:\n{}\n\n", self.context_error));
         }
         text.push_str(match self.context_mode() {
-            crate::settings::ContextMode::Automatic => "Terminal + passende Projektinfos.\nUnterordner erst bei Projektfragen.\n\n",
-            crate::settings::ContextMode::Terminal => "Ordner, Befehle und Ausgaben.\nProjektdateien werden nicht gelesen.\n\n",
-            crate::settings::ContextMode::Off => "Kein neuer Zusatzkontext ab der nächsten Frage.\nBisherige Fragen und Antworten bleiben im Gespräch.\nFür einen frischen Verlauf Amber schließen und neu öffnen.\n",
+            crate::settings::ContextMode::Automatic => "Terminal + relevant project info.\nSubfolders only for project questions.\n\n",
+            crate::settings::ContextMode::Terminal => "Folder, commands and output.\nProject files are not read.\n\n",
+            crate::settings::ContextMode::Off => "No new context from the next question.\nEarlier questions and answers stay in the conversation.\nClose and reopen Amber for a fresh conversation.\n",
         });
         if self.context_choice != 4 {
             text.push_str(&self.context_details[self.context_choice]);
@@ -324,7 +321,7 @@ impl App {
         text
     }
     pub fn context_summary(&self, _width: u16) -> String {
-        format!("{} · Ctrl-K Kontext", self.context_mode().label())
+        format!("{} · Ctrl-K Context", self.context_mode().label())
     }
     pub fn answer_status(&self) -> AnswerStatus {
         if self.active {
@@ -376,13 +373,13 @@ impl App {
     }
     pub fn begin(&mut self) -> Result<(String, Vec<(String, String)>), String> {
         if self.active {
-            return Err("Antwort läuft noch".into());
+            return Err("Answer still in progress".into());
         }
         if self.turns.len() >= 20 {
-            return Err("20 Fragen erreicht – bitte neuen Dialog öffnen".into());
+            return Err("20 questions reached – please open a new conversation".into());
         }
         if self.editor.text.trim().is_empty() {
-            return Err("Bitte eine Frage eingeben".into());
+            return Err("Please enter a question".into());
         }
         let conversation = self
             .turns
@@ -406,13 +403,13 @@ impl App {
         });
         self.active = true;
         self.indicator_frame = 0;
-        self.status = "Antwort wird empfangen …".into();
+        self.status = "Receiving answer …".into();
         Ok((question, conversation))
     }
     pub fn delta(&mut self, text: &str) -> Result<(), String> {
-        let turn = self.turns.last_mut().ok_or("Keine laufende Frage")?;
+        let turn = self.turns.last_mut().ok_or("No active question")?;
         if turn.stream.len() + text.len() > 256 * 1024 {
-            return Err("Antwort überschreitet 256 KiB".into());
+            return Err("Answer exceeds 256 KiB".into());
         }
         turn.stream.push_str(text);
         Ok(())
@@ -420,16 +417,16 @@ impl App {
     pub fn complete(&mut self, reply: Reply) -> Result<(), String> {
         validate_command(&reply.command)?;
         if reply.explanation.len() + reply.command.len() > 256 * 1024 {
-            return Err("Antwort zu groß".into());
+            return Err("Answer too large".into());
         }
         let index = self
             .turns
             .len()
             .checked_sub(1)
-            .ok_or("Keine laufende Frage")?;
+            .ok_or("No active question")?;
         self.turns[index].reply = Some(reply);
         self.active = false;
-        self.status = "Bereit · Rückfrage oder Befehl übernehmen".into();
+        self.status = "Ready · Ask a follow-up or use the command".into();
         if !self.manual_selection || self.selected.is_none() {
             self.selected = Some(self.history_base() + index);
         }

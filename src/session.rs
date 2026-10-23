@@ -337,7 +337,7 @@ impl Client {
 
 pub fn run(arguments: &[String]) -> Result<i32, String> {
     if unsafe { libc::isatty(0) } != 1 || unsafe { libc::isatty(1) } != 1 {
-        return Err("Ausgabe-Erfassung benötigt ein interaktives Terminal".into());
+        return Err("Output capture requires an interactive terminal".into());
     }
     let mut term: libc::termios = unsafe { std::mem::zeroed() };
     let mut size: libc::winsize = unsafe { std::mem::zeroed() };
@@ -387,7 +387,7 @@ pub fn run(arguments: &[String]) -> Result<i32, String> {
             .env("AMBER_SHELL_CAPTURE_OWNER", std::process::id().to_string())
             .env("AMBER_SHELL_CAPTURE_TOKEN", &token);
         let error = command.exec();
-        eprintln!("amber-shell: Shell konnte nicht gestartet werden: {error}");
+        eprintln!("amber-shell: Could not start the shell: {error}");
         unsafe {
             libc::_exit(127);
         }
@@ -399,7 +399,7 @@ pub fn run(arguments: &[String]) -> Result<i32, String> {
     match relay(master.as_raw_fd(), &listener, &signals, &mut child, &token) {
         Ok(code) => Ok(code),
         Err(error) => {
-            eprintln!("amber-shell: Terminalverbindung beendet: {error}");
+            eprintln!("amber-shell: Terminal connection ended: {error}");
             Ok(1)
         }
     }
@@ -656,7 +656,7 @@ fn relay(
 }
 
 pub fn fallback(arguments: &[String], reason: &str) -> Result<i32, String> {
-    eprintln!("amber-shell: Ausgabe-Erfassung nicht verfügbar ({reason}); normale Shell startet.");
+    eprintln!("amber-shell: Output capture is unavailable ({reason}); starting a normal shell.");
     let arguments = if arguments.first().map(String::as_str) == Some("--") {
         &arguments[1..]
     } else {

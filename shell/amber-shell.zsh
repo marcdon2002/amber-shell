@@ -34,7 +34,7 @@ _amber-shell-read-result() {
 }
 
 amber-shell-widget() {
-  zle >/dev/null 2>&1 || { print -u2 -r -- 'amber-shell: Dieses Widget benötigt eine aktive ZLE-Eingabe.'; return 1; }
+  zle >/dev/null 2>&1 || { print -u2 -r -- 'amber-shell: This widget requires an active ZLE input.'; return 1; }
   emulate -L zsh
   setopt localoptions multibyte
   local old_buffer=$BUFFER old_cursor=$CURSOR
@@ -48,7 +48,7 @@ amber-shell-widget() {
   [[ ${AMBER_SHELL_SIMULATE:-0} == 1 ]] && extra_args+=(--simulate)
   [[ ${AMBER_SHELL_CAPTURE:-1} != 0 && -S ${AMBER_SHELL_CAPTURE_SOCKET:-} ]] && extra_args+=(--capture-socket "$AMBER_SHELL_CAPTURE_SOCKET")
   if [[ ! -x $binary ]]; then
-    zle -M 'amber-shell: Binary fehlt; Installation oder AMBER_SHELL_BIN prüfen.'
+    zle -M 'amber-shell: Binary is missing; check the installation or AMBER_SHELL_BIN.'
     return 1
   fi
   {
@@ -80,7 +80,7 @@ amber-shell-widget() {
       CURSOR=${#BUFFER}
       accepted=1
     elif (( result_status != 2 )); then
-      zle -M 'amber-shell: Keine gültige Rückgabe; vorherige Eingabe bleibt erhalten.'
+      zle -M 'amber-shell: No valid result; previous input preserved.'
     fi
   } always {
     [[ -n $tty_state ]] && command stty "$tty_state" <"$tty_device" 2>/dev/null
@@ -107,7 +107,7 @@ _amber-shell-bind() {
     if [[ $action == undefined-key || $action == amber-shell-widget ]]; then
       bindkey -M "$map" "$key" amber-shell-widget
     else
-      print -u2 -r -- "amber-shell: $map $key ist bereits belegt ($action); Bindung bleibt erhalten."
+      print -u2 -r -- "amber-shell: $map $key is already assigned ($action); binding preserved."
     fi
   done
 }

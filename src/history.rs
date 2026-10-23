@@ -52,28 +52,28 @@ pub fn record_mode(cwd: &Path, entry: HistoryEntry, simulated: bool) -> Result<(
 fn history_directory() -> Result<PathBuf, String> {
     let base = match std::env::var_os("XDG_CONFIG_HOME").filter(|s| !s.is_empty()) {
         Some(path) => PathBuf::from(path),
-        None => {
-            PathBuf::from(std::env::var_os("HOME").ok_or("HOME fehlt; Verlauf nicht verfügbar.")?)
-                .join(".config")
-        }
+        None => PathBuf::from(
+            std::env::var_os("HOME").ok_or("HOME is missing; history is unavailable.")?,
+        )
+        .join(".config"),
     };
     if !base.is_absolute() {
-        return Err("Der Verlaufsordner muss ein absoluter Pfad sein.".into());
+        return Err("The history directory must be an absolute path.".into());
     }
     Ok(base.join("amber-shell"))
 }
 fn canonical_cwd(cwd: &Path) -> Result<String, String> {
     let cwd = cwd
         .canonicalize()
-        .map_err(|_| "Arbeitsverzeichnis für Verlauf nicht bestimmbar.")?;
+        .map_err(|_| "Could not determine the working directory for history.")?;
     if !cwd.is_dir() {
-        return Err("Verlauf benötigt ein Arbeitsverzeichnis.".into());
+        return Err("History requires a working directory.".into());
     }
     let value = cwd
         .to_str()
-        .ok_or("Arbeitsverzeichnis für Verlauf ist kein UTF-8.")?;
+        .ok_or("The working directory for history is not valid UTF-8.")?;
     if value.len() > 4096 {
-        return Err("Arbeitsverzeichnis für Verlauf ist zu lang.".into());
+        return Err("The working directory for history is too long.".into());
     }
     Ok(value.into())
 }
@@ -88,19 +88,19 @@ fn validate_entry(entry: &HistoryEntry) -> Result<(), String> {
                 .any(|c| c.is_control() && c != '\n' && c != '\t')
         })
     {
-        return Err("Verlaufseintrag ist ungültig oder überschreitet das Größenlimit.".into());
+        return Err("The history entry is invalid or exceeds the size limit.".into());
     }
     crate::model::validate_command(&entry.command)
-        .map_err(|_| "Verlaufseintrag enthält keinen gültigen Befehl.".into())
+        .map_err(|_| "The history entry does not contain a valid command.".into())
 }
 fn open_directory(path: &Path, create: bool) -> Result<Option<File>, String> {
     if create {
-        fs::create_dir_all(path.parent().ok_or("Ungültiger Verlaufsordner.")?)
-            .map_err(|_| "Verlaufsordner konnte nicht erstellt werden.")?;
+        fs::create_dir_all(path.parent().ok_or("Invalid history directory.")?)
+            .map_err(|_| "Could not create the history directory.")?;
         match fs::DirBuilder::new().mode(0o700).create(path) {
             Ok(()) => {}
             Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {}
-            Err(_) => return Err("Verlaufsordner konnte nicht erstellt werden.".into()),
+            Err(_) => return Err("Could not create the history directory.".into()),
         }
     }
     let directory = match OpenOptions::new()
@@ -110,14 +110,14 @@ fn open_directory(path: &Path, create: bool) -> Result<Option<File>, String> {
     {
         Ok(file) => file,
         Err(e) if e.kind() == std::io::ErrorKind::NotFound && !create => return Ok(None),
-        Err(_) => return Err("Unsicherer oder nicht lesbarer Verlaufsordner.".into()),
+        Err(_) => return Err("Unsafe or unreadable history directory.".into()),
     };
     let metadata = directory
         .metadata()
-        .map_err(|_| "Verlaufsordner konnte nicht geprüft werden.")?;
+        .map_err(|_| "Could not inspect the history directory.")?;
     if metadata.uid() != unsafe { libc::geteuid() } || metadata.mode() & 0o022 != 0 {
         return Err(
-            "Verlaufsordner muss dem Benutzer gehören und darf nicht fremd beschreibbar sein."
+            "The history directory must belong to the current user and must not be writable by others."
                 .into(),
         );
     }
@@ -138,19 +138,19 @@ fn open_private(directory: &File, name: &CStr, flags: i32) -> Result<Option<File
         {
             return Ok(None);
         }
-        return Err("Verlaufsdatei konnte nicht sicher geöffnet werden.".into());
+        return Err("Could not open the history file safely.".into());
     }
     let file = unsafe { File::from_raw_fd(fd) };
     let metadata = file
         .metadata()
-        .map_err(|_| "Verlaufsdatei konnte nicht geprüft werden.")?;
+        .map_err(|_| "Could not inspect the history file.")?;
     if !metadata.is_file()
         || metadata.uid() != unsafe { libc::geteuid() }
         || metadata.nlink() != 1
         || metadata.mode() & 0o077 != 0
         || metadata.len() > MAX_FILE as u64
     {
-        return Err("Verlauf benötigt eine private eigene reguläre Datei bis 128 KiB.".into());
+        return Err("History requires a private regular file owned by the current user, no larger than 128 KiB.".into());
     }
     Ok(Some(file))
 }
@@ -175,16 +175,14 @@ fn read_entries(directory: &File, simulated: bool) -> Result<Vec<HistoryEntry>, 
     let mut bytes = Vec::new();
     file.take(MAX_FILE as u64 + 1)
         .read_to_end(&mut bytes)
-        .map_err(|_| "Verlauf konnte nicht gelesen werden.")?;
+        .map_err(|_| "Could not read history.")?;
     if bytes.len() > MAX_FILE {
-        return Err("Verlauf überschreitet 128 KiB.".into());
+        return Err("History exceeds 128 KiB.".into());
     }
     let history: StoredHistory = serde_json::from_slice(&bytes)
-        .map_err(|_| "Gespeicherter Verlauf ist ungültig; Datei bitte prüfen.")?;
+        .map_err(|_| "The saved history is invalid; check the file.")?;
     if history.version != 1 || history.entries.len() > MAX_ENTRIES {
-        return Err(
-            "Gespeicherter Verlauf hat eine ungültige Version oder zu viele Einträge.".into(),
-        );
+        return Err("The saved history has an invalid version or too many entries.".into());
     }
     for entry in &history.entries {
         validate_entry(entry)?;
@@ -221,7 +219,7 @@ fn record_at_mode(
 ) -> Result<(), String> {
     entry.cwd = canonical_cwd(cwd)?;
     validate_entry(&entry)?;
-    let directory = open_directory(directory, true)?.ok_or("Verlaufsordner fehlt.")?;
+    let directory = open_directory(directory, true)?.ok_or("The history directory is missing.")?;
     // A persistent inode serializes atomic replacements across terminal sessions.
     // Never wait on another writer while the interactive terminal is in raw mode.
     let lock = open_private(
@@ -229,12 +227,9 @@ fn record_at_mode(
         lock_name(simulated),
         libc::O_RDWR | libc::O_CREAT,
     )?
-    .ok_or("Verlaufssperre fehlt.")?;
+    .ok_or("The history lock is missing.")?;
     if unsafe { libc::flock(lock.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) } != 0 {
-        return Err(
-            "Verlauf wird gerade in einem anderen Terminal gespeichert; Eintrag nicht gespeichert."
-                .into(),
-        );
+        return Err("History is being saved in another terminal; the entry was not saved.".into());
     }
     let mut entries = read_entries(&directory, simulated)?;
     entries.push(entry);
@@ -246,13 +241,12 @@ fn record_at_mode(
         entries,
     };
     let bytes = loop {
-        let bytes = serde_json::to_vec(&history)
-            .map_err(|_| "Verlauf konnte nicht serialisiert werden.")?;
+        let bytes = serde_json::to_vec(&history).map_err(|_| "Could not serialize history.")?;
         if bytes.len() < MAX_FILE {
             break bytes;
         }
         if history.entries.len() <= 1 {
-            return Err("Verlaufseintrag überschreitet das Dateilimit.".into());
+            return Err("The history entry exceeds the file size limit.".into());
         }
         history.entries.remove(0);
     };
@@ -281,16 +275,15 @@ fn atomic_write(directory: &File, bytes: &[u8], simulated: bool) -> Result<(), S
             break;
         }
         if std::io::Error::last_os_error().kind() != std::io::ErrorKind::AlreadyExists {
-            return Err("Temporäre Verlaufsdatei konnte nicht erstellt werden.".into());
+            return Err("Could not create a temporary history file.".into());
         }
     }
-    let (name, mut file) =
-        temporary.ok_or("Temporäre Verlaufsdatei konnte nicht erstellt werden.")?;
+    let (name, mut file) = temporary.ok_or("Could not create a temporary history file.")?;
     let result = (|| {
         file.write_all(bytes)
             .and_then(|_| file.write_all(b"\n"))
             .and_then(|_| file.sync_all())
-            .map_err(|_| "Verlauf konnte nicht gespeichert werden.".to_string())?;
+            .map_err(|_| "Could not save history.".to_string())?;
         if unsafe {
             libc::renameat(
                 directory.as_raw_fd(),
@@ -300,11 +293,11 @@ fn atomic_write(directory: &File, bytes: &[u8], simulated: bool) -> Result<(), S
             )
         } != 0
         {
-            return Err("Verlauf konnte nicht atomar ersetzt werden.".into());
+            return Err("Could not atomically replace history.".into());
         }
         directory
             .sync_all()
-            .map_err(|_| "Verlaufsordner konnte nicht synchronisiert werden.".into())
+            .map_err(|_| "Could not synchronize the history directory.".into())
     })();
     unsafe {
         libc::unlinkat(directory.as_raw_fd(), name.as_ptr(), 0);
@@ -322,8 +315,8 @@ mod tests {
 
     fn entry(number: usize) -> HistoryEntry {
         HistoryEntry {
-            question: format!("Frage {number}"),
-            explanation: "Eine kurze Erklärung".into(),
+            question: format!("Question {number}"),
+            explanation: "A short explanation".into(),
             command: format!("  printf '%s\\n' 'ä e\u{301} 👩‍💻 {number}'\n\n"),
             cwd: "caller cannot select another directory".into(),
         }
@@ -356,11 +349,11 @@ mod tests {
         record_at_mode(&directory, temp.path(), entry(2), true).unwrap();
         assert_eq!(
             load_at_mode(&directory, temp.path(), false).unwrap()[0].question,
-            "Frage 1"
+            "Question 1"
         );
         let simulated = load_at_mode(&directory, temp.path(), true).unwrap();
         assert_eq!(simulated.len(), 1);
-        assert_eq!(simulated[0].question, "Frage 2");
+        assert_eq!(simulated[0].question, "Question 2");
         for name in [
             "history.json",
             "history-simulated.json",
@@ -394,7 +387,7 @@ mod tests {
         let next = load_at(&directory, &other).unwrap();
         assert_eq!(
             next.iter().map(|e| e.question.as_str()).collect::<Vec<_>>(),
-            ["Frage 2", "Frage 3"]
+            ["Question 2", "Question 3"]
         );
     }
     #[test]
@@ -406,8 +399,8 @@ mod tests {
         }
         let loaded = load_at(&directory, temp.path()).unwrap();
         assert_eq!(loaded.len(), 20);
-        assert_eq!(loaded.first().unwrap().question, "Frage 5");
-        assert_eq!(loaded.last().unwrap().question, "Frage 24");
+        assert_eq!(loaded.first().unwrap().question, "Question 5");
+        assert_eq!(loaded.last().unwrap().question, "Question 24");
     }
     #[test]
     fn serialized_byte_limit_evicts_whole_old_entries_without_trimming_new_commands() {
@@ -422,7 +415,7 @@ mod tests {
         }
         let loaded = load_at(&directory, temp.path()).unwrap();
         assert!(loaded.len() < 8 && !loaded.is_empty());
-        assert_eq!(loaded.last().unwrap().question, "Frage 7");
+        assert_eq!(loaded.last().unwrap().question, "Question 7");
         assert_eq!(loaded.last().unwrap().command, command);
         assert!(fs::metadata(directory.join("history.json")).unwrap().len() <= 128 * 1024);
     }

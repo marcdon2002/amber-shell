@@ -24,6 +24,31 @@ fn text(index: &ProjectIndex, q: &str) -> String {
         .join("\n")
 }
 #[test]
+fn english_documentation_questions_include_readme_context() {
+    let temp = tempfile::tempdir().unwrap();
+    put(
+        temp.path(),
+        "README.md",
+        "Generate documentation with npm run docs.",
+    );
+    put(
+        temp.path(),
+        "package.json",
+        r#"{"scripts":{"docs":"typedoc"}}"#,
+    );
+    let index = ProjectIndex::discover(temp.path());
+    for question in [
+        "How do I generate documentation?",
+        "How do I generate the npm documentation?",
+        "How do I build the docs?",
+    ] {
+        assert!(amber_shell::projects::relevant(question), "{question}");
+        assert!(text(&index, question).contains("README.md"), "{question}");
+    }
+    assert!(!amber_shell::projects::relevant("How do I list folders?"));
+    assert!(!text(&index, "npm dev").contains("README.md"));
+}
+#[test]
 fn ignores_tracked_files_ignored_subtrees_and_generated_dependencies() {
     let temp = tempfile::tempdir().unwrap();
     let root = temp.path();
@@ -207,7 +232,7 @@ fn root_and_child_use_the_same_encoded_project_budget() {
     let selected = ProjectIndex::discover(root).select("npm dev");
     let body = selected
         .iter()
-        .map(|f| format!("\n--- {} ---\n{}\n--- Dateiende ---\n", f.path, f.content))
+        .map(|f| format!("\n--- {} ---\n{}\n--- End of file ---\n", f.path, f.content))
         .collect::<String>();
     assert!(serde_json::to_string(&body).unwrap().len() <= 8192);
 }

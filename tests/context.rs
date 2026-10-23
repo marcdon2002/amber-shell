@@ -221,7 +221,7 @@ fn no_raw_terminal_controls_escape_from_files_or_paths() {
     put(&cwd, "README.md", "benign\n\u{1b}]52;c;clipboard\u{7}");
     let ctx = collect(&cwd, &[]);
     let rendered = ctx.render(true, true);
-    assert!(rendered.contains("Arbeitsverzeichnis"));
+    assert!(rendered.contains("Working directory"));
     assert!(
         rendered
             .chars()
@@ -327,5 +327,5 @@ fn attachment_details_list_only_entries_that_survive_the_send_budget() {
     let off = context.payload(false, false);
     assert!(off.files.is_empty() && off.commands.is_empty());
     assert!(!off.text.contains("printf harmless"));
-    assert!(off.details.contains("Projektdateien: aus"));
+    assert!(off.details.contains("Project files: off"));
 }

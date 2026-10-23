@@ -49,6 +49,7 @@ for line in sys.stdin:
  if method=='config/read': result={{'config':{{'mcp_servers':{{'private-server':{{'enabled':mode=='unsafe-config'}}}}}}}}
  if method=='thread/start':
   assert 'simplest' in p['baseInstructions'] and 'ls' in p['baseInstructions']
+  assert 'Answer in English unless the user explicitly requests another language.' in p['developerInstructions']
   assert p['ephemeral'] is True and p['environments']==[] and p['model']=='gpt-6-luna'
   assert p['modelProvider']=='openai' and p['sandbox']=='read-only'
   assert p['serviceTier']==('priority' if mode in ['fast','wrong-tier'] else 'default')
@@ -131,25 +132,25 @@ fn api_key_login_cannot_fall_back_to_paid_requests() {
 #[test]
 fn unexpected_tool_request_is_refused() {
     let e = finish("tool").unwrap_err();
-    assert!(e.contains("Tool"), "{e}");
+    assert!(e.contains("tool"), "{e}");
 }
 
 #[test]
 fn incomplete_eof_never_becomes_command() {
     let e = finish("eof").unwrap_err();
-    assert!(e.contains("beendet") || e.contains("EOF"), "{e}");
+    assert!(e.contains("ended") || e.contains("EOF"), "{e}");
 }
 
 #[test]
 fn final_message_without_turn_completion_cannot_be_accepted() {
     let e = finish("missing-completion").unwrap_err();
-    assert!(e.contains("beendet") || e.contains("EOF"), "{e}");
+    assert!(e.contains("ended") || e.contains("EOF"), "{e}");
 }
 
 #[test]
 fn inherited_enabled_mcp_configuration_aborts_before_inference() {
     let e = finish("unsafe-config").unwrap_err();
-    assert!(e.contains("Isolation"), "{e}");
+    assert!(e.contains("isolation"), "{e}");
 }
 
 #[test]
@@ -161,7 +162,7 @@ fn server_error_is_reported_without_completion() {
 #[test]
 fn oversized_stream_is_rejected() {
     let e = finish("oversize").unwrap_err();
-    assert!(e.contains("Limit"), "{e}");
+    assert!(e.contains("limit"), "{e}");
 }
 
 #[test]
@@ -346,7 +347,7 @@ fn catalog_cancellation_reaps_its_child_promptly() {
 #[test]
 fn server_model_substitution_is_rejected() {
     let error = finish("wrong-model").unwrap_err();
-    assert!(error.contains("Modell"), "{error}");
+    assert!(error.contains("model"), "{error}");
 }
 
 #[test]
@@ -373,7 +374,7 @@ fn unconfirmed_fast_tier_cannot_silently_use_standard() {
     req.fast = true;
     let error = finish_with_request("wrong-tier", req).unwrap_err();
     assert!(
-        error.contains("Fast") || error.contains("Dienststufe"),
+        error.contains("Fast") || error.contains("service tier"),
         "{error}"
     );
 }

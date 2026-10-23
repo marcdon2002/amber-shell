@@ -129,7 +129,7 @@ fn startup_includes_recent_commands_and_context_can_be_disabled() {
     assert_eq!(app.selected_context(), "both");
     app.context_choice = 4;
     assert_eq!(app.selected_context(), "");
-    assert!(app.context_preview().contains("Keine") || app.context_preview().contains("Kein"));
+    assert!(app.context_preview().contains("No new context"));
 }
 
 #[test]
@@ -149,7 +149,7 @@ fn disabling_new_context_preserves_followup_history_and_explains_that_limit() {
     assert!(history[0].1.contains("vorheriger Dateikontext"));
     assert!(
         app.context_preview()
-            .contains("Bisherige Fragen und Antworten bleiben")
+            .contains("Earlier questions and answers stay")
     );
 }
 

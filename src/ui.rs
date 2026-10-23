@@ -211,7 +211,7 @@ pub fn explanation_text(raw: &str) -> String {
 // Show the readable explanation while a JSON string is still streaming.
 pub fn streaming_text(raw: &str) -> String {
     let Some(key) = raw.find("\"explanation\"") else {
-        return "Antwort wird formuliert ...".into();
+        return "Composing answer ...".into();
     };
     let Some(colon) = raw[key + 13..].find(':') else {
         return String::new();
@@ -296,7 +296,7 @@ fn append_turn(
     let rail = if ascii { "| " } else { "│ " };
     let continuation = if ascii { "|        " } else { "│        " };
     let start = content.len();
-    content.push_str(&format!("{rail}Du:    {}\n", safe_text(&turn.question)));
+    content.push_str(&format!("{rail}You:   {}\n", safe_text(&turn.question)));
     spans.push(ContentSpan {
         range: start..content.len(),
         kind: ContentKind::Question,
@@ -309,7 +309,7 @@ fn append_turn(
     if let Some(reply) = &turn.reply {
         content.push_str(&explanation_text(&reply.explanation));
     } else if let Some(error) = &turn.error {
-        content.push_str(&format!("Fehler: {}", safe_text(error)));
+        content.push_str(&format!("Error: {}", safe_text(error)));
     } else {
         content.push_str(&explanation_text(&streaming_text(&turn.stream)));
     }
@@ -376,7 +376,7 @@ fn row_line(
 pub fn render(frame: &mut Frame, app: &mut App) {
     let mut area = frame.area();
     if area.width < 24 || area.height < 6 {
-        frame.render_widget(Paragraph::new("Fenster vergrößern | Esc zurück"), area);
+        frame.render_widget(Paragraph::new("Enlarge window | Esc back"), area);
         frame.set_cursor_position((area.x, area.y));
         app.cursor_row = area.y;
         return;
@@ -391,7 +391,7 @@ pub fn render(frame: &mut Frame, app: &mut App) {
     } else {
         if app.command_focus {
             if !app.shell_commands.is_empty() {
-                content.push_str(&chrome("Shell · letzte Befehle\n", app.ascii));
+                content.push_str(&chrome("Shell · recent commands\n", app.ascii));
                 for (i, command) in app.shell_commands.iter().enumerate() {
                     append_command(
                         &mut content,
@@ -406,7 +406,7 @@ pub fn render(frame: &mut Frame, app: &mut App) {
                 content.push('\n');
             }
             if !app.past_turns.is_empty() {
-                content.push_str(&chrome("Amber · früher in diesem Ordner\n", app.ascii));
+                content.push_str(&chrome("Amber · earlier in this folder\n", app.ascii));
                 for (i, turn) in app.past_turns.iter().enumerate() {
                     append_turn(
                         &mut content,
@@ -419,15 +419,14 @@ pub fn render(frame: &mut Frame, app: &mut App) {
                 }
             }
             if !app.turns.is_empty() {
-                content.push_str("Aktueller Dialog\n");
+                content.push_str("Current conversation\n");
             }
             if app.history_empty() {
-                content
-                    .push_str("Noch kein Verlauf in diesem Ordner.\nTab führt zurück zur Frage.");
+                content.push_str("No history in this folder yet.\nTab returns to your question.");
             }
         }
         if !app.command_focus && app.turns.is_empty() {
-            content.push_str("Frag nach einem Befehl.\nZum Beispiel: Welche Ports sind offen?");
+            content.push_str("Ask for a command.\nFor example: Which ports are open?");
         }
         for (i, turn) in app.turns.iter().enumerate() {
             latest_question_offset = Some(content.len());
@@ -593,32 +592,32 @@ pub fn render(frame: &mut Frame, app: &mut App) {
             .style(if app.model_picker { amber } else { muted }),
         Rect::new(area.x + model_col, area.y, model_width, 1),
     );
-    let notice = !app.status.is_empty() && !app.active && !app.status.starts_with("Bereit");
+    let notice = !app.status.is_empty() && !app.active && !app.status.starts_with("Ready");
     let state = if app.model_picker {
         if compact_header {
-            "Modelle"
+            "Models"
         } else {
-            "Modellwahl"
+            "Choose model"
         }
     } else if app.reviewing {
-        "Kontext"
+        "Context"
     } else if notice && status != AnswerStatus::Error {
-        "Hinweis"
+        "Notice"
     } else if app.command_focus {
-        "Verlauf"
+        "History"
     } else {
         match status {
-            AnswerStatus::Ready => "Bereit",
-            AnswerStatus::Waiting => "Wartet",
+            AnswerStatus::Ready => "Ready",
+            AnswerStatus::Waiting => "Waiting",
             AnswerStatus::Streaming => {
                 if compact_header {
                     "Stream"
                 } else {
-                    "Antwort läuft"
+                    "Streaming"
                 }
             }
-            AnswerStatus::Complete => "Fertig",
-            AnswerStatus::Error => "Fehler",
+            AnswerStatus::Complete => "Done",
+            AnswerStatus::Error => "Error",
         }
     };
     let metadata_col = if compact_header {
@@ -638,9 +637,9 @@ pub fn render(frame: &mut Frame, app: &mut App) {
     );
     let metadata = if app.model_picker {
         if metadata_width < 20 {
-            "↑↓ Modell".into()
+            "↑↓ Model".into()
         } else {
-            "↑↓ Modell · Ctrl-F Fast".into()
+            "↑↓ Model · Ctrl-F Fast".into()
         }
     } else if app.reviewing {
         app.context_mode().label().into()
@@ -650,12 +649,12 @@ pub fn render(frame: &mut Frame, app: &mut App) {
             app.past_turns.len() + app.turns.iter().filter(|t| t.reply.is_some()).count(),
             app.shell_commands.len()
         )
-    } else if notice || app.active && app.status.starts_with("Modellwechsel") {
+    } else if notice || app.active && app.status.starts_with("Model change") {
         safe_text(&app.status)
     } else if metadata_width < 14 {
         "Ctrl-K".into()
     } else if metadata_width < 36 {
-        "Ctrl-K Kontext".into()
+        "Ctrl-K Context".into()
     } else {
         app.context_summary(metadata_width)
     };
@@ -695,7 +694,7 @@ pub fn render(frame: &mut Frame, app: &mut App) {
     app.cursor_row = input.y;
     if app.model_picker {
         let lines: Vec<Line> = if app.model_loading {
-            vec![Line::styled("Verfügbare Modelle werden geladen …", muted)]
+            vec![Line::styled("Loading available models …", muted)]
         } else if !app.model_error.is_empty() {
             wrap(&safe_text(&app.model_error), body.width as usize)
                 .into_iter()
@@ -717,7 +716,7 @@ pub fn render(frame: &mut Frame, app: &mut App) {
                             if i == app.model_cursor { ">" } else { " " },
                             safe_text(&m.label),
                             if m.id == app.model_id {
-                                "  (aktiv)"
+                                "  (active)"
                             } else {
                                 ""
                             }
@@ -736,12 +735,12 @@ pub fn render(frame: &mut Frame, app: &mut App) {
                     .is_some_and(|m| m.supports_fast)
                 {
                     if app.picker_fast {
-                        "Ctrl-F Fast an · Abo 2,5×/Credits 2×"
+                        "Ctrl-F Fast on · Plan 2.5×/Credits 2×"
                     } else {
-                        "Ctrl-F Fast aus · Abo 2,5×/Credits 2×"
+                        "Ctrl-F Fast off · Plan 2.5×/Credits 2×"
                     }
                 } else {
-                    "Fast für dieses Modell nicht verfügbar"
+                    "Fast unavailable for this model"
                 },
                 app.ascii,
             ))
@@ -751,9 +750,9 @@ pub fn render(frame: &mut Frame, app: &mut App) {
         frame.render_widget(
             Paragraph::new(chrome(
                 if app.model_error.is_empty() {
-                    "↑↓ wählen · Enter speichern · Esc"
+                    "↑↓ select · Enter save · Esc"
                 } else {
-                    "Ctrl-O erneut laden · Esc zurück"
+                    "Ctrl-O reload · Esc back"
                 },
                 app.ascii,
             ))
@@ -834,9 +833,9 @@ pub fn render(frame: &mut Frame, app: &mut App) {
         }
         lines.push(Line::styled(
             if app.ascii {
-                "|        ^ frühere Zeilen"
+                "|        ^ earlier lines"
             } else {
-                "│        ↑ frühere Zeilen"
+                "│        ↑ earlier lines"
             },
             muted,
         ));
@@ -865,9 +864,9 @@ pub fn render(frame: &mut Frame, app: &mut App) {
     if command_continues {
         lines.push(Line::styled(
             if app.ascii {
-                "|        v weiter"
+                "|        v more"
             } else {
-                "│        ↓ weiter"
+                "│        ↓ more"
             },
             muted,
         ));
@@ -878,12 +877,12 @@ pub fn render(frame: &mut Frame, app: &mut App) {
             Paragraph::new(chrome(
                 if area.width < 40 {
                     if area.width < 28 {
-                        "A Auto  T Term  X Aus"
+                        "A Auto  T Term  X Off"
                     } else {
-                        "A Auto · T Terminal · X Aus"
+                        "A Auto · T Terminal · X Off"
                     }
                 } else {
-                    "A Automatisch · T Terminal · X Aus"
+                    "A Automatic · T Terminal only · X Off"
                 },
                 app.ascii,
             ))
@@ -894,12 +893,12 @@ pub fn render(frame: &mut Frame, app: &mut App) {
             Paragraph::new(chrome(
                 if area.width < 65 {
                     if area.width < 28 {
-                        "Tab Anhang  ↑↓  Enter"
+                        "Tab details  ↑↓  Enter"
                     } else {
-                        "Tab Anhang · ↑↓ · Enter"
+                        "Tab details · ↑↓ · Enter"
                     }
                 } else {
-                    "Tab Anhang · ↑↓ lesen · Enter/Esc zurück"
+                    "Tab details · ↑↓ read · Enter/Esc back"
                 },
                 app.ascii,
             ))
@@ -909,11 +908,11 @@ pub fn render(frame: &mut Frame, app: &mut App) {
     } else {
         if composer {
             let title = if app.command_focus {
-                " Frage · Tab zum Schreiben "
+                " Question · Tab to type "
             } else if app.turns.is_empty() {
-                " Frage "
+                " Question "
             } else {
-                " Rückfrage "
+                " Follow-up "
             };
             let mut block = Block::default()
                 .borders(Borders::ALL)
@@ -947,9 +946,9 @@ pub fn render(frame: &mut Frame, app: &mut App) {
         let prefix = if composer || area.width < 40 {
             "> "
         } else if app.ascii_input {
-            "Frage > "
+            "Ask > "
         } else {
-            "Frage › "
+            "Ask › "
         };
         let available = input.width.saturating_sub(prefix.width() as u16 + 1) as usize;
         let skip = cursor_cells.saturating_sub(available);
@@ -966,9 +965,9 @@ pub fn render(frame: &mut Frame, app: &mut App) {
         if placeholder {
             text = chrome(
                 if app.turns.is_empty() {
-                    "Was möchtest du tun?"
+                    "What would you like to do?"
                 } else {
-                    "Deine Rückfrage …"
+                    "Your follow-up …"
                 },
                 app.ascii_input,
             );
@@ -990,14 +989,14 @@ pub fn render(frame: &mut Frame, app: &mut App) {
         }
         let hint = if app.command_focus {
             if area.width < 65 {
-                "↑↓ lesen · ←→ wählen · Enter nehmen"
+                "↑↓ read · ←→ select · Enter use"
             } else {
-                "↑↓ lesen · ←→ Befehl wählen · Enter übernehmen · Tab Frage · Esc zurück"
+                "↑↓ read · ←→ command · Enter use · Tab ask · Esc back"
             }
         } else if area.width < 65 {
-            "Enter senden · Tab lesen · Ctrl-Y"
+            "Enter send · Tab read · Ctrl-Y"
         } else {
-            "Enter senden · Tab Verlauf · Ctrl-Y übernehmen · Esc schließen"
+            "Enter send · Tab history · Ctrl-Y use · Esc close"
         };
         frame.render_widget(
             Paragraph::new(chrome(hint, app.ascii_input)).style(muted),

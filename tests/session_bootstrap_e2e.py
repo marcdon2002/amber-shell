@@ -98,7 +98,7 @@ class BootstrapTests(unittest.TestCase):
             long_directory.mkdir()
             env['TMPDIR']=str(long_directory)
             output=self.run_tty(['-il'],env,b'BOOT_READY>')
-            self.assertIn(b'normale Shell startet',output)
+            self.assertIn(b'starting a normal shell',output)
             self.assertEqual((root/'endpoint').read_text(),'')
             self.assertEqual((root/'startup-count').read_text().splitlines(),['.zshenv','.zprofile','.zlogin'])
 

@@ -167,5 +167,5 @@ fn send_budget_shortens_large_tails_instead_of_dropping_the_whole_error_chain() 
         assert!(app.selected_context().contains(&format!("ERROR_STEP_{n}")));
     }
     assert!(serde_json::to_string(app.selected_context()).unwrap().len() < 14 * 1024);
-    assert!(app.selected_context().contains("Gekürzt"));
+    assert!(app.selected_context().contains("Truncated"));
 }
